@@ -42,6 +42,14 @@ Scores for the current puzzle and all-time scores (including wins) are saved in 
 
 These only work for the broadcaster and moderators. In **Interact** mode you can also press **N** for a new puzzle or **H** for a hint.
 
+## Control page (`control.html`)
+
+This is a separate page with buttons for: new puzzle (choose the difficulty), reveal a hint, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
+
+Add it in OBS as a second Browser Source and keep it hidden. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
+
+Load both sources the same way, as `file:///…` URLs in the URL field. The control page talks to the game through shared browser storage, so the two must have the same origin.
+
 ## URL options
 
 | Param | Default | Meaning |
@@ -60,6 +68,7 @@ These only work for the broadcaster and moderators. In **Interact** mode you can
 ## Files
 
 - `index.html`: the page (setup screen and game)
+- `control.html`: streamer control panel
 - `js/sudoku.js`: puzzle generator. Every puzzle has exactly one solution.
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering

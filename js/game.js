@@ -18,6 +18,9 @@
   const ROTATION = ['easy', 'medium', 'hard'];
   const LS_ALL = 'numbersonstream.alltime';
   const LS_CUR = 'numbersonstream.current';
+  const LS_CMD = 'numbersonstream.cmd';
+  const LS_STATUS = 'numbersonstream.status';
+  const LS_HEARTBEAT = 'numbersonstream.heartbeat';
 
   function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
   const $ = (s) => document.querySelector(s);
@@ -147,9 +150,17 @@
     const [, sub = '', arg = ''] = text.toLowerCase().split(/\s+/);
     if (sub === 'score' || sub === 'rank') return; // reserved; scores are always on screen
     if (!(msg.isMod || msg.isBroadcaster)) return;
+    runCommand(sub, arg);
+  }
+
+  // Shared by mod chat commands, hotkeys and the control page.
+  function runCommand(sub, arg) {
     if (sub === 'new' || sub === 'skip') newRound(ROTATION.includes(arg) ? arg : undefined);
     else if (sub === 'hint') giveHint();
     else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
+    else if (sub === 'resetround') {
+      if (state) { state.scores = {}; save(); renderBoards(); feed({ type: 'system', text: 'Scores for this puzzle reset' }); }
+    }
   }
 
   // ---------- Scoring ----------
@@ -349,10 +360,28 @@
 
   // ---------- Status ----------
   function setStatus(s, detail) {
+    store.set(LS_STATUS, { text: statusText(s, detail), state: s });
     const el = $('#status');
     el.dataset.state = s;
-    el.textContent = s === 'connected' ? `● reading #${detail}` : s === 'connecting' ? '○ connecting…' : s === 'demo' ? '● demo mode' : `○ disconnected — ${detail || ''}`;
+    el.textContent = statusText(s, detail);
   }
+  function statusText(s, detail) {
+    return s === 'connected' ? `● reading #${detail}` : s === 'connecting' ? '○ connecting…' : s === 'demo' ? '● demo mode' : `○ disconnected — ${detail || ''}`;
+  }
+
+  // ---------- Control page link ----------
+  // control.html sends commands through localStorage (storage event) and a
+  // BroadcastChannel; both reach every page of the same origin in OBS.
+  const seenCmds = new Set();
+  function onControl(c) {
+    if (!c || !c.id || seenCmds.has(c.id) || Date.now() - c.t > 10000) return;
+    seenCmds.add(c.id);
+    if (c.cmd === 'chat') handleChat({ user: 'streamer', displayName: c.name || 'Streamer', color: '#FFD700', isBroadcaster: true, isMod: true, text: String(c.arg || '') });
+    else runCommand(c.cmd, c.arg || '');
+  }
+  window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
+  try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
+  setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
 
   // ---------- Boot ----------
   buildBoard();
