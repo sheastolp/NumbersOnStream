@@ -1,0 +1,412 @@
+(() => {
+  const ROWS = 'ABCDEFGHI';
+  const params = new URLSearchParams(location.search);
+  const cfg = {
+    channel: (params.get('channel') || '').trim(),
+    difficulty: (params.get('difficulty') || 'rotate').toLowerCase(),
+    prefix: params.get('prefix') || '',
+    hintAfter: num(params.get('hint'), 60), // seconds with no progress before a free cell is revealed (0 = off)
+    cooldown: num(params.get('cooldown'), 3), // seconds a player waits after a wrong guess
+    nextIn: num(params.get('next'), 20), // seconds between puzzles
+    maxPerMsg: num(params.get('max'), 3), // moves accepted from a single chat message
+    demo: params.get('demo') === '1',
+    test: params.get('test') === '1',
+    transparent: params.get('bg') === 'transparent',
+  };
+
+  const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
+  const ROTATION = ['easy', 'medium', 'hard'];
+  const LS_ALL = 'numbersonstream.alltime';
+  const LS_CUR = 'numbersonstream.current';
+
+  function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
+  const $ = (s) => document.querySelector(s);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+
+  // ---------- Setup screen (no channel given) ----------
+  if (!cfg.channel && !cfg.demo) {
+    document.body.classList.add('setup-mode');
+    const form = $('#setup-form');
+    const out = $('#setup-url');
+    const update = () => {
+      const fd = new FormData(form);
+      const u = new URL(location.href.split('?')[0]);
+      for (const [k, v] of fd.entries()) if (v !== '') u.searchParams.set(k, v);
+      if (!fd.get('bg')) u.searchParams.delete('bg');
+      out.value = u.toString();
+    };
+    form.addEventListener('input', update);
+    form.addEventListener('submit', (e) => { e.preventDefault(); update(); location.href = out.value; });
+    $('#setup-copy').addEventListener('click', () => { update(); out.select(); navigator.clipboard?.writeText(out.value); });
+    $('#setup-demo').addEventListener('click', () => { location.search = '?demo=1'; });
+    update();
+    return;
+  }
+
+  if (cfg.transparent) document.body.classList.add('transparent');
+
+  // ---------- State ----------
+  let state = null; // { puzzle, solution, grid, owners, scores, difficulty, round, startedAt, lastProgress }
+  let allTime = store.get(LS_ALL, {});
+  const cooldowns = new Map();
+  let roundOver = false;
+  let nextTimer = null;
+
+  function nextDifficulty() {
+    if (ROTATION.includes(cfg.difficulty)) return cfg.difficulty;
+    const prev = state ? ROTATION.indexOf(state.difficulty) : -1;
+    return ROTATION[(prev + 1) % ROTATION.length];
+  }
+
+  function newRound(difficulty) {
+    clearInterval(nextTimer);
+    roundOver = false;
+    $('#overlay').classList.remove('show');
+    difficulty = difficulty || nextDifficulty();
+    const { puzzle, solution } = Sudoku.generate(difficulty);
+    state = {
+      puzzle, solution,
+      grid: puzzle.slice(),
+      owners: new Array(81).fill(null),
+      scores: {},
+      difficulty,
+      round: (state ? state.round : 0) + 1,
+      startedAt: Date.now(),
+      lastProgress: Date.now(),
+    };
+    save();
+    renderAll();
+    feed({ type: 'system', text: `New ${state.difficulty} puzzle! Type a cell and a number, e.g. B7 4` });
+  }
+
+  function save() { store.set(LS_CUR, state); store.set(LS_ALL, allTime); }
+
+  // ---------- Colors ----------
+  function hashHue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; }
+  function readableColor(hex, name) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return `hsl(${hashHue(name)} 80% 68%)`;
+    const n = parseInt(m[1], 16);
+    let r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0; const l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    return `hsl(${Math.round(h)} ${Math.round(Math.max(s, 0.55) * 100)}% ${Math.round(Math.min(Math.max(l, 0.62), 0.8) * 100)}%)`;
+  }
+
+  // ---------- Chat parsing ----------
+  // Accepts "B7 4", "b7=4", "B74", "!B7 4" and several moves per message.
+  const MOVE_RE = /(?:^|[^A-Za-z0-9])([A-Ia-i])([1-9])\s*[=:\-]?\s*([1-9])(?![0-9])/g;
+
+  function parseMoves(text) {
+    let t = text.trim();
+    if (cfg.prefix) {
+      if (!t.toLowerCase().startsWith(cfg.prefix.toLowerCase())) return [];
+      t = t.slice(cfg.prefix.length);
+    }
+    const moves = [];
+    for (const m of t.matchAll(MOVE_RE)) {
+      moves.push({ index: ROWS.indexOf(m[1].toUpperCase()) * 9 + (+m[2] - 1), value: +m[3], label: m[1].toUpperCase() + m[2] });
+      if (moves.length >= cfg.maxPerMsg) break;
+    }
+    return moves;
+  }
+
+  function handleChat(msg) {
+    const text = msg.text.trim();
+    if (/^!sudoku\b/i.test(text)) return handleCommand(msg, text);
+    if (roundOver || !state) return;
+    const moves = parseMoves(text);
+    if (!moves.length) return;
+    const now = Date.now();
+    if ((cooldowns.get(msg.user) || 0) > now) return;
+    const player = { user: msg.user, name: msg.displayName, color: readableColor(msg.color, msg.user) };
+    for (const mv of moves) {
+      if (state.grid[mv.index]) continue; // already filled (given or solved)
+      if (state.solution[mv.index] === mv.value) {
+        correct(player, mv);
+        if (roundOver) break;
+      } else {
+        wrong(player, mv);
+        cooldowns.set(msg.user, now + cfg.cooldown * 1000);
+        break;
+      }
+    }
+    save();
+  }
+
+  function handleCommand(msg, text) {
+    const [, sub = '', arg = ''] = text.toLowerCase().split(/\s+/);
+    if (sub === 'score' || sub === 'rank') return; // reserved; scores are always on screen
+    if (!(msg.isMod || msg.isBroadcaster)) return;
+    if (sub === 'new' || sub === 'skip') newRound(ROTATION.includes(arg) ? arg : undefined);
+    else if (sub === 'hint') giveHint();
+    else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
+  }
+
+  // ---------- Scoring ----------
+  function addPoints(player, pts) {
+    const r = (state.scores[player.user] ||= { name: player.name, color: player.color, points: 0, cells: 0 });
+    const a = (allTime[player.user] ||= { name: player.name, color: player.color, points: 0, cells: 0, wins: 0 });
+    r.name = a.name = player.name; r.color = a.color = player.color;
+    r.points = Math.max(0, r.points + pts);
+    a.points = Math.max(0, a.points + pts);
+    if (pts > 0 && pts >= POINTS.correct) { r.cells++; a.cells++; }
+  }
+
+  function completedUnits(i) {
+    const out = [];
+    const check = (kind, u, label) => { if (Sudoku.UNITS[kind][u].every((j) => state.grid[j])) out.push(label); };
+    const r = Sudoku.row(i), c = Sudoku.col(i), b = Sudoku.box(i);
+    check('row', r, `row ${ROWS[r]}`);
+    check('col', c, `column ${c + 1}`);
+    check('box', b, 'box');
+    return out;
+  }
+
+  function correct(player, mv) {
+    state.grid[mv.index] = mv.value;
+    state.owners[mv.index] = { name: player.name, color: player.color };
+    state.lastProgress = Date.now();
+    let pts = POINTS.correct;
+    const units = completedUnits(mv.index);
+    pts += units.length * POINTS.unit;
+    const finished = state.grid.every(Boolean);
+    if (finished) pts += POINTS.finish;
+    addPoints(player, pts);
+    renderCell(mv.index, 'pop');
+    if (units.length) flashUnits(mv.index, units.length);
+    feed({ type: 'good', player, text: `${mv.label} = ${mv.value}`, pts, extra: units.length ? `completed ${units.join(' + ')}` : '' });
+    renderBoards();
+    if (finished) endRound();
+  }
+
+  function wrong(player, mv) {
+    addPoints(player, POINTS.wrong);
+    const cell = cells[mv.index];
+    cell.num.textContent = mv.value;
+    cell.el.classList.remove('wrong'); void cell.el.offsetWidth; cell.el.classList.add('wrong');
+    setTimeout(() => { cell.el.classList.remove('wrong'); renderCell(mv.index); }, 900);
+    feed({ type: 'bad', player, text: `${mv.label} ≠ ${mv.value}`, pts: POINTS.wrong });
+    renderBoards();
+  }
+
+  function giveHint() {
+    if (roundOver || !state) return;
+    const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+    if (!empty.length) return;
+    const i = empty[Math.floor(Math.random() * empty.length)];
+    state.grid[i] = state.solution[i];
+    state.owners[i] = { hint: true };
+    state.lastProgress = Date.now();
+    renderCell(i, 'pop');
+    feed({ type: 'system', text: `Hint: ${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} = ${state.solution[i]}` });
+    save();
+    if (state.grid.every(Boolean)) endRound();
+  }
+
+  function ranked(obj) { return Object.entries(obj).map(([user, s]) => ({ user, ...s })).sort((a, b) => b.points - a.points || b.cells - a.cells); }
+
+  function endRound() {
+    roundOver = true;
+    const top = ranked(state.scores);
+    if (top[0]) allTime[top[0].user].wins = (allTime[top[0].user].wins || 0) + 1;
+    save();
+    renderBoards();
+    const secs = Math.round((Date.now() - state.startedAt) / 1000);
+    $('#ov-time').textContent = `Solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
+    const list = $('#ov-list'); list.replaceChildren();
+    top.slice(0, 5).forEach((p, idx) => list.append(row(idx + 1, p.name, p.color, `${p.points} pts · ${p.cells} cells`)));
+    $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody — hints solved it!';
+    $('#ov-mvp').style.color = top[0] ? top[0].color : '';
+    $('#overlay').classList.add('show');
+    let left = cfg.nextIn;
+    $('#ov-next').textContent = left;
+    nextTimer = setInterval(() => {
+      left--;
+      $('#ov-next').textContent = Math.max(0, left);
+      if (left <= 0) newRound();
+    }, 1000);
+  }
+
+  // ---------- Rendering ----------
+  const cells = [];
+  function buildBoard() {
+    const board = $('#board');
+    const corner = document.createElement('div'); corner.className = 'lbl'; board.append(corner);
+    for (let c = 1; c <= 9; c++) { const l = document.createElement('div'); l.className = 'lbl col'; l.textContent = c; board.append(l); }
+    for (let r = 0; r < 9; r++) {
+      const l = document.createElement('div'); l.className = 'lbl row'; l.textContent = ROWS[r]; board.append(l);
+      for (let c = 0; c < 9; c++) {
+        const i = r * 9 + c;
+        const el = document.createElement('div');
+        el.className = 'cell';
+        if (c % 3 === 2 && c < 8) el.classList.add('br');
+        if (r % 3 === 2 && r < 8) el.classList.add('bb');
+        const numEl = document.createElement('span'); numEl.className = 'num';
+        const who = document.createElement('span'); who.className = 'who';
+        const coord = document.createElement('span'); coord.className = 'coord'; coord.textContent = ROWS[r] + (c + 1);
+        el.append(coord, numEl, who);
+        board.append(el);
+        cells.push({ el, num: numEl, who });
+      }
+    }
+  }
+
+  function renderCell(i, anim) {
+    const { el, num: n, who } = cells[i];
+    const v = state.grid[i];
+    const owner = state.owners[i];
+    el.classList.toggle('given', !!state.puzzle[i]);
+    el.classList.toggle('empty', !v);
+    el.classList.toggle('hint', !!(owner && owner.hint));
+    el.classList.toggle('claimed', !!(owner && !owner.hint));
+    n.textContent = v || '';
+    n.style.color = owner && !owner.hint ? owner.color : '';
+    who.textContent = owner ? (owner.hint ? 'hint' : owner.name) : '';
+    who.style.color = owner && !owner.hint ? owner.color : '';
+    if (anim) { el.classList.remove(anim); void el.offsetWidth; el.classList.add(anim); }
+  }
+
+  function flashUnits(i, count) {
+    const hits = [];
+    const r = Sudoku.row(i), c = Sudoku.col(i), b = Sudoku.box(i);
+    for (const [kind, u] of [['row', r], ['col', c], ['box', b]]) {
+      if (Sudoku.UNITS[kind][u].every((j) => state.grid[j])) hits.push(...Sudoku.UNITS[kind][u]);
+    }
+    for (const j of new Set(hits)) { const el = cells[j].el; el.classList.remove('unit'); void el.offsetWidth; el.classList.add('unit'); }
+  }
+
+  function row(rank, name, color, detail) {
+    const li = document.createElement('li');
+    const rk = document.createElement('span'); rk.className = 'rk'; rk.textContent = rank;
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name; nm.style.color = color;
+    const dt = document.createElement('span'); dt.className = 'dt'; dt.textContent = detail;
+    li.append(rk, nm, dt);
+    return li;
+  }
+
+  function renderBoards() {
+    const r = $('#round-list'); r.replaceChildren();
+    const rr = ranked(state.scores).slice(0, 5);
+    rr.forEach((p, i) => r.append(row(i + 1, p.name, p.color, `${p.points}`)));
+    if (!rr.length) r.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: 'No points yet — be first!' }));
+    const a = $('#all-list'); a.replaceChildren();
+    const aa = ranked(allTime).slice(0, 5);
+    aa.forEach((p, i) => a.append(row(i + 1, p.name, p.color, `${p.points}${p.wins ? ` · ${p.wins}🏆` : ''}`)));
+    if (!aa.length) a.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: '—' }));
+  }
+
+  function renderAll() {
+    cells.forEach((_, i) => renderCell(i));
+    $('#round-no').textContent = `Puzzle #${state.round}`;
+    $('#difficulty').textContent = state.difficulty;
+    $('#difficulty').dataset.level = state.difficulty;
+    renderBoards();
+  }
+
+  function feed(item) {
+    const ul = $('#feed');
+    const li = document.createElement('li');
+    li.className = item.type;
+    if (item.player) {
+      const nm = document.createElement('b'); nm.textContent = item.player.name; nm.style.color = item.player.color;
+      li.append(nm, ' ');
+    }
+    const t = document.createElement('span'); t.textContent = item.text; li.append(t);
+    if (item.pts) { const p = document.createElement('em'); p.textContent = (item.pts > 0 ? ' +' : ' ') + item.pts; li.append(p); }
+    if (item.extra) { const x = document.createElement('small'); x.textContent = ' ' + item.extra; li.append(x); }
+    ul.prepend(li);
+    while (ul.children.length > 8) ul.lastChild.remove();
+  }
+
+  function fmtTime(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+
+  function tick() {
+    if (!state) return;
+    if (!roundOver) {
+      const secs = Math.floor((Date.now() - state.startedAt) / 1000);
+      $('#timer').textContent = fmtTime(secs);
+      const filled = state.grid.filter(Boolean).length;
+      $('#progress-bar').style.width = `${(filled / 81) * 100}%`;
+      $('#remaining').textContent = `${81 - filled} left`;
+      if (cfg.hintAfter > 0) {
+        const idle = (Date.now() - state.lastProgress) / 1000;
+        const left = Math.ceil(cfg.hintAfter - idle);
+        $('#hint-in').textContent = left > 0 ? `hint in ${left}s` : '';
+        if (left <= 0) giveHint();
+      }
+    }
+  }
+
+  // ---------- Status ----------
+  function setStatus(s, detail) {
+    const el = $('#status');
+    el.dataset.state = s;
+    el.textContent = s === 'connected' ? `● reading #${detail}` : s === 'connecting' ? '○ connecting…' : s === 'demo' ? '● demo mode' : `○ disconnected — ${detail || ''}`;
+  }
+
+  // ---------- Boot ----------
+  buildBoard();
+  $('#how-prefix').textContent = cfg.prefix;
+  $('#how-prefix2').textContent = cfg.prefix;
+  const saved = store.get(LS_CUR, null);
+  if (saved && saved.solution && saved.grid && !saved.grid.every(Boolean)) {
+    state = saved;
+    state.lastProgress = Date.now();
+    renderAll();
+    feed({ type: 'system', text: 'Puzzle restored — keep going!' });
+  } else {
+    if (saved) state = saved; // keep round counter/difficulty rotation
+    newRound();
+  }
+  setInterval(tick, 250);
+  tick();
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === 'n' || e.key === 'N') newRound();
+    if (e.key === 'h' || e.key === 'H') giveHint();
+  });
+
+  if (cfg.channel) {
+    TwitchChat.connect(cfg.channel, { onMessage: handleChat, onStatus: setStatus });
+  }
+
+  if (cfg.demo) {
+    if (!cfg.channel) setStatus('demo');
+    const bots = ['PixelPanda', 'grid_wizard', 'NineLives', 'boxbuster', 'Quokka42', 'ZenSolver', 'kettlecorn', 'MossyRock'];
+    const colors = ['#FF4500', '#1E90FF', '#9ACD32', '#DAA520', '#8A2BE2', '#00FF7F', '#FF69B4', ''];
+    setInterval(() => {
+      if (roundOver) return;
+      const k = Math.floor(Math.random() * bots.length);
+      const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+      if (!empty.length) return;
+      const i = empty[Math.floor(Math.random() * empty.length)];
+      const good = Math.random() < 0.75;
+      const v = good ? state.solution[i] : ((state.solution[i] + Math.floor(Math.random() * 8)) % 9) + 1;
+      const variants = [`${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} ${v}`, `${ROWS[Sudoku.row(i)].toLowerCase()}${Sudoku.col(i) + 1}=${v}`, `ok ${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} ${v} i think`];
+      handleChat({ user: bots[k].toLowerCase(), displayName: bots[k], color: colors[k], text: cfg.prefix + variants[Math.floor(Math.random() * variants.length)] });
+    }, 900);
+  }
+
+  if (cfg.test) {
+    const box = $('#test-input');
+    box.hidden = false;
+    box.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !box.value.trim()) return;
+      handleChat({ user: 'streamer', displayName: 'Streamer', color: '#FFD700', isBroadcaster: true, isMod: true, text: box.value });
+      box.value = '';
+    });
+  }
+
+  window.__sudokuOnStream = { handleChat, get state() { return state; }, parseMoves, newRound, giveHint };
+})();
