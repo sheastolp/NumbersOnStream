@@ -33,6 +33,8 @@ Chat shares one set of pencil marks. Viewers can jot down which numbers might go
 | `B7?-3` | Rubs out the 3 |
 | `B7?x` (or `B7?0`) | Clears all notes in B7 |
 
+One empty cell always has a dashed outline and shows its real notes: every number that can still go there. The How to play panel shows the exact command that makes those notes (for example `G1?235`), so chat always has a correct example on screen. When that cell is filled, the example moves to another empty cell. Chat can't change the example cell's notes.
+
 Notes are free: they're never checked and never score. When a number is placed, that cell's notes disappear, and the number is rubbed out of the notes in every cell it now rules out. Mods can type `!sudoku clearnotes` to wipe them all. Turn notes off with `notes=0` in the URL, or untick the box on the setup screen.
 
 ### Scoring

@@ -188,6 +188,7 @@
       puzzle: p.puzzle, solution: p.solution,
       grid: p.puzzle.slice(),
       notes: new Array(81).fill(0), // pencil marks: bit v set = note v
+      example: -1, // empty cell that always shows its real notes as an on-screen example
       owners: new Array(81).fill(null),
       scores: {},
       level: p.level,
@@ -200,6 +201,7 @@
       lastProgress: Date.now(),
     };
     if (paused) { pausedAt = Date.now(); store.set(LS_PAUSED, { paused, at: pausedAt }); }
+    pickExample();
     save();
     renderAll();
     const geo = Sudoku.geometry(state.variant);
@@ -350,7 +352,7 @@
   // Shared by the whole chat; never scored or checked, just a scratchpad.
   function applyNotes(list) {
     for (const n of list) {
-      if (state.grid[n.index]) continue;
+      if (state.grid[n.index] || n.index === state.example) continue; // the example cell's notes are automatic
       const before = state.notes[n.index];
       if (n.op === 'clear') state.notes[n.index] = 0;
       else if (n.op === 'remove') state.notes[n.index] &= ~n.mask;
@@ -366,6 +368,52 @@
     for (const p of Sudoku.geometry(state.variant).peers[i]) {
       if (state.notes[p] & (1 << v)) { state.notes[p] &= ~(1 << v); renderCell(p); }
     }
+  }
+
+  // ---------- Notes example ----------
+  // One empty cell always shows its real notes (every number that can still go
+  // there), and the How to play panel shows the exact chat command for it.
+  const digitsOf = (mask) => [1, 2, 3, 4, 5, 6, 7, 8, 9].filter((d) => mask & (1 << d));
+  const cellLabel = (i) => ROWS[Sudoku.row(i)] + (Sudoku.col(i) + 1);
+
+  function candidates(i) {
+    let used = 0;
+    for (const p of Sudoku.geometry(state.variant).peers[i]) used |= 1 << state.grid[p];
+    return 0x3fe & ~used;
+  }
+
+  // Keep the current example while it's empty; otherwise pick a new one,
+  // preferring 2-3 candidates so the example is short and easy to read.
+  function pickExample() {
+    if (!cfg.notes) { state.example = -1; return; }
+    if (state.example >= 0 && !state.grid[state.example]) return;
+    const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+    if (!empty.length) { state.example = -1; return; }
+    const nice = empty.filter((i) => { const k = digitsOf(candidates(i)).length; return k >= 2 && k <= 3; });
+    const pool = nice.length ? nice : empty;
+    state.example = pool[Math.floor(Math.random() * pool.length)];
+    state.notes[state.example] = 0;
+  }
+
+  function renderExample() {
+    const i = state.example;
+    $('#note-ex').hidden = i < 0;
+    if (i < 0) return;
+    const ds = digitsOf(candidates(i));
+    const lbl = cellLabel(i);
+    $('#note-ex-cmd').textContent = `${cfg.prefix}${lbl}?${ds.join('')}`;
+    $('#note-ex-what').textContent = ds.length === 1 ? `pencils in ${ds[0]}` : `pencils in ${ds.slice(0, -1).join(', ')} & ${ds[ds.length - 1]}`;
+    $('#note-ex-cell').textContent = lbl;
+  }
+
+  // After any cell is filled: the example's notes may shrink, or the example
+  // itself was filled and moves to another empty cell.
+  function refreshExample() {
+    const old = state.example;
+    pickExample();
+    if (old >= 0 && old !== state.example) renderCell(old);
+    if (state.example >= 0) renderCell(state.example);
+    renderExample();
   }
 
   function clearAllNotes() {
@@ -397,6 +445,7 @@
     state.owners[mv.index] = { name: player.name, color: player.color };
     state.lastProgress = Date.now();
     cleanNotes(mv.index);
+    refreshExample();
     if (state.stats) state.stats.correct++;
     let pts = POINTS.correct;
     const units = completedUnits(mv.index);
@@ -432,6 +481,7 @@
     state.lastProgress = Date.now();
     if (state.stats) state.stats.hints++;
     cleanNotes(i);
+    refreshExample();
     renderCell(i, 'pop');
     feed({ type: 'system', text: `Hint: ${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} = ${state.solution[i]}` });
     save();
@@ -508,7 +558,9 @@
     n.style.color = owner && !owner.hint ? inkFor(owner.color) : '';
     who.textContent = owner ? (owner.hint ? 'hint' : owner.name) : '';
     who.style.color = owner && !owner.hint ? inkFor(owner.color) : '';
-    const mask = v ? 0 : (state.notes && state.notes[i]) || 0;
+    const isExample = !v && i === state.example;
+    const mask = v ? 0 : isExample ? candidates(i) : (state.notes && state.notes[i]) || 0;
+    el.classList.toggle('example', isExample);
     el.classList.toggle('has-notes', !!mask);
     [...cells[i].notes.children].forEach((s, k) => s.classList.toggle('on', !!(mask & (1 << (k + 1)))));
     if (anim) { el.classList.remove(anim); void el.offsetWidth; el.classList.add(anim); }
@@ -547,6 +599,7 @@
     for (const u of geo.extra) for (const c of u.cells) cells[c].el.classList.add(u.cls);
     $('#board').dataset.variant = geo.key;
     cells.forEach((_, i) => renderCell(i));
+    renderExample();
     $('#round-no').textContent = `Puzzle #${state.round}`;
     $('#difficulty').textContent = `Lv ${state.level} · ${Sudoku.LEVELS[state.level].name}`;
     $('#difficulty').dataset.level = tier(state.level);
@@ -639,6 +692,8 @@
     state.level = levelOf(saved);
     state.variant = Sudoku.VARIANTS[saved.variant] ? saved.variant : 'classic';
     if (!Array.isArray(state.notes)) state.notes = new Array(81).fill(0);
+    if (typeof state.example !== 'number') state.example = -1;
+    pickExample();
     if (!state.stats) state.stats = { correct: 0, wrong: 0, hints: 0, toFill: state.puzzle.filter((v) => !v).length };
     state.lastProgress = Date.now();
     renderAll();
