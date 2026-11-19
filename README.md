@@ -93,7 +93,7 @@ These only work for the broadcaster and moderators. In **Interact** mode you can
 
 This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
 
-Add it in OBS as a second Browser Source and keep it hidden. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
+Add it in OBS as a second Browser Source sized **1920 × 1080** and keep it hidden. The page is laid out for 1080p and scrolls on its own if it's taller than the window, even with OBS's default custom CSS. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
 
 Load both sources the same way, as `file:///…` URLs in the URL field. The control page talks to the game through shared browser storage, so the two must have the same origin.
 
