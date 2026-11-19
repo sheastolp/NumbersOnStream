@@ -89,10 +89,14 @@
 
     <section class="card">
       <h2>Next puzzles</h2>
-      <div class="lvl"><span>Difficulty</span><b id="lvl-out">5 · Tricky</b></div>
-      <input id="lvl" type="range" min="1" max="10" step="1" value="5">
-      <div class="ends"><span>1 Beginner</span><span>10 Fiendish</span></div>
-      <label class="check"><input id="rot" type="checkbox"> Rotate 3 → 5 → 8</label>
+      <select id="mode">
+        <option value="auto">Adaptive: follows how chat answers</option>
+        <option value="fixed">Fixed level</option>
+        <option value="rotate">Cycle every level 1 → 20</option>
+      </select>
+      <div class="lvl"><span id="lvl-lbl">Difficulty</span><b id="lvl-out">7 · Medium</b></div>
+      <input id="lvl" type="range" min="1" max="20" step="1" value="7">
+      <div class="ends"><span>1 Beginner</span><span>20 Nightmare</span></div>
       <select id="variant">
         <option value="mix">Mix it up (classic between twists)</option>
         <option value="classic">Classic only</option>
@@ -130,11 +134,12 @@
   <div id="log"></div>
 
 </div>
+  <script src="js/sudoku.js"></script>
   <script>
     const LS_CMD = 'numbersonstream.cmd', LS_CUR = 'numbersonstream.current',
           LS_STATUS = 'numbersonstream.status', LS_HEARTBEAT = 'numbersonstream.heartbeat',
           LS_SETTINGS = 'numbersonstream.settings';
-    const LEVEL_NAMES = ['', 'Beginner', 'Easy', 'Casual', 'Medium', 'Tricky', 'Hard', 'Harder', 'Expert', 'Master', 'Fiendish'];
+    const LEVEL_NAMES = Sudoku.LEVELS.map((l) => (l ? l.name : ''));
     const VARIANT_NAMES = { classic: 'Classic', diagonal: 'Diagonal', windoku: 'Windoku', centerdot: 'Center Dot', asterisk: 'Asterisk' };
     const $ = (s) => document.querySelector(s);
     const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
@@ -163,30 +168,29 @@
     });
 
     // ---- Difficulty slider / variant ----
-    const lvl = $('#lvl'), rot = $('#rot'), variant = $('#variant');
+    const lvl = $('#lvl'), mode = $('#mode'), variant = $('#variant');
     let touched = 0; // don't overwrite the controls right after the streamer changes them
     function showLevel() {
-      lvl.disabled = rot.checked;
-      $('#lvl-out').textContent = rot.checked ? 'Rotating' : `${lvl.value} · ${LEVEL_NAMES[lvl.value]}`;
+      lvl.disabled = mode.value === 'rotate';
+      $('#lvl-lbl').textContent = mode.value === 'auto' ? 'Next puzzle level (adjusts itself)' : 'Difficulty';
+      $('#lvl-out').textContent = mode.value === 'rotate' ? 'Cycling 1 → 20' : `${lvl.value} · ${LEVEL_NAMES[lvl.value]}`;
     }
+    const levelCmd = () => mode.value === 'rotate' ? 'rotate' : `${mode.value} ${lvl.value}`;
     lvl.addEventListener('input', () => { touched = Date.now(); showLevel(); });
-    lvl.addEventListener('change', () => { touched = Date.now(); send('level', lvl.value, `Difficulty ${lvl.value} for next puzzles`); });
-    rot.addEventListener('change', () => {
-      touched = Date.now(); showLevel();
-      send('level', rot.checked ? 'rotate' : lvl.value, rot.checked ? 'Rotate difficulty' : `Difficulty ${lvl.value}`);
-    });
+    lvl.addEventListener('change', () => { touched = Date.now(); send('level', levelCmd(), `Difficulty ${lvl.value} for next puzzles`); });
+    mode.addEventListener('change', () => { touched = Date.now(); showLevel(); send('level', levelCmd(), mode.selectedOptions[0].text); });
     variant.addEventListener('change', () => { touched = Date.now(); send('variant', variant.value, `Puzzle type: ${variant.selectedOptions[0].text}`); });
     $('#new-now').addEventListener('click', () => {
       const v = variant.value === 'mix' ? '' : variant.value;
-      const l = rot.checked ? '' : lvl.value;
+      const l = mode.value === 'fixed' ? lvl.value : ''; // adaptive / cycle choose the level themselves
       send('new', `${v} ${l}`.trim(), 'New puzzle');
     });
     function syncSettings() {
       if (Date.now() - touched < 3000) return;
       const st = read(LS_SETTINGS);
       if (!st) return;
-      rot.checked = st.level === 'rotate';
-      if (st.level !== 'rotate') lvl.value = st.level;
+      if (st.mode) mode.value = st.mode;
+      if (Number.isFinite(+st.level)) lvl.value = st.level;
       if (st.variant) variant.value = st.variant;
       showLevel();
     }
@@ -212,7 +216,7 @@
       if (!s || !s.grid) return;
       const filled = s.grid.filter(Boolean).length;
       $('#round').textContent = '#' + s.round;
-      const level = s.level || ({ easy: 3, medium: 5, hard: 8 })[s.difficulty] || '—';
+      const level = s.level || Sudoku.toLevel(s.difficulty);
       $('#diff').textContent = `Lv ${level}`;
       $('#var').textContent = `${VARIANT_NAMES[s.variant] || 'Classic'} · ${LEVEL_NAMES[level] || ''}`;
       $('#left').textContent = 81 - filled;

@@ -14,11 +14,17 @@
       <p>Your chat solves a Sudoku together. This page only <em>reads</em> chat anonymously — no bot account or login needed.</p>
       <form id="setup-form">
         <label>Twitch channel <input name="channel" placeholder="yourchannel" required autocomplete="off"></label>
-        <label><span>Difficulty: <b id="setup-level">5 · Tricky</b></span>
-          <input type="range" name="difficulty" min="1" max="10" step="1" value="5">
-          <span class="range-ends"><span>1 Beginner</span><span>10 Fiendish</span></span>
+        <label>Difficulty mode
+          <select name="mode">
+            <option value="auto">Adaptive: gets harder or easier based on chat's answers</option>
+            <option value="fixed">Fixed: always the level below</option>
+            <option value="rotate">Cycle: every level in turn, 1 → 20</option>
+          </select>
         </label>
-        <label class="check"><input type="checkbox" name="rotate" value="1"> Rotate difficulty instead (3 → 5 → 8)</label>
+        <label><span><span id="setup-level-lbl">Starting difficulty:</span> <b id="setup-level">7 · Medium</b></span>
+          <input type="range" name="difficulty" min="1" max="20" step="1" value="7">
+          <span class="range-ends"><span>1 Beginner</span><span>20 Nightmare</span></span>
+        </label>
         <label>Puzzle type
           <select name="variant">
             <option value="mix">Mix it up (classic between twists)</option>
@@ -100,6 +106,7 @@
         <div id="ov-mvp"></div>
         <div id="ov-time"></div>
         <ol id="ov-list" class="lb"></ol>
+        <div id="ov-adapt"></div>
         <div class="ov-next">Next puzzle in <b id="ov-next"></b>s</div>
       </div>
     </div>

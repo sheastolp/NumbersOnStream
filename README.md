@@ -46,21 +46,40 @@ Notes are free: they're never checked and never score. When a number is placed, 
 
 Scores for the current puzzle and all-time scores (including wins) are saved in the browser source. The puzzle in progress is saved too, so refreshing the source doesn't lose it.
 
-## Difficulty (1–10)
+## Difficulty (1–20)
 
-The difficulty slider on the setup screen and control page picks a level from 1 to 10. Each puzzle is graded by a solver that works like a person does, so the level reflects how hard the puzzle actually is to reason through, not just how many numbers are missing.
+Every puzzle is graded by a solver that works like a person does, so a level reflects how hard the puzzle is to reason through, not just how many numbers are missing. Every puzzle has exactly one solution, and the givens are placed symmetrically.
 
-| Level | Name | Givens | Hardest technique needed |
+| Levels | Names | Givens | Hardest technique needed |
 |---|---|---|---|
-| 1–4 | Beginner, Easy, Casual, Medium | 46 → 32 | Singles only (one spot left, or one number left) |
-| 5 | Tricky | ~29 | Locked candidates (sometimes) |
-| 6 | Hard | ~27 | Locked candidates |
-| 7 | Harder | ~26 | Naked / hidden pairs and triples |
-| 8 | Expert | ~24 | Pairs and triples, sometimes X-wing |
-| 9 | Master | ~23 | X-wing when one turns up in time; otherwise the hardest found |
-| 10 | Fiendish | as few as possible | Beyond X-wing (chat will need to think hard) |
+| 1–8 | Beginner → Medium+ | 48 → 30 | Singles only (one spot left, or one number left) |
+| 9–11 | Tricky, Tricky+, Hard | 29 → 27 | Locked candidates |
+| 12–14 | Hard+, Harder, Tough | 26 → 24 | Naked / hidden pairs and triples |
+| 15–16 | Expert, Expert+ | 24 → 23 | X-wing (when one turns up in time) |
+| 17–18 | Master, Grandmaster | as few as possible | Swordfish or XY-wing |
+| 19 | Fiendish | as few as possible | Beyond all of the above (trial and error) |
+| 20 | Nightmare | as few as possible | The most trial and error found in 1.5 s |
 
-`rotate` cycles levels 3 → 5 → 8. Every puzzle has exactly one solution, and the givens are placed symmetrically.
+### Difficulty modes
+
+| Mode | What happens |
+|---|---|
+| **Adaptive** (default) | Starts at the slider's level, then each puzzle adjusts to how chat did on the last one |
+| **Fixed** | Always the slider's level |
+| **Cycle** | Every level in turn: 1, 2, 3 … 20, then back to 1 |
+
+**How adaptive decides**, after each solved puzzle:
+
+| Chat's result | Next puzzle |
+|---|---|
+| 90 %+ of answers right and no hints | **up 2** |
+| 75 %+ right and hints for at most 10 % of the empty cells | **up 1** |
+| under 50 % right, or hints for over 30 % of the cells | **down 2** |
+| under 65 % right, or hints for over 15 % of the cells | **down 1** |
+| anything in between | same level |
+| puzzle skipped before it was solved | **down 1** |
+
+The end screen shows the result, e.g. "Next: level 12 · Hard+ — ▲ up 1 (86% right, 1 hint)". If you set a level yourself during a puzzle, your choice wins over the automatic step.
 
 ## Puzzle types
 
@@ -81,7 +100,9 @@ All types use the same 9×9 grid and the same `B7 4` chat input. The extra regio
 | Command | Effect |
 |---|---|
 | `!sudoku new` | New puzzle. Optional type and/or level: `!sudoku new 7`, `!sudoku new diagonal`, `!sudoku new windoku 9` |
-| `!sudoku level 6` | Set the difficulty for upcoming puzzles (`1`–`10` or `rotate`) |
+| `!sudoku level 12` | Fixed difficulty for upcoming puzzles (`1`–`20`) |
+| `!sudoku level auto` / `!sudoku level auto 8` | Adaptive difficulty (optionally starting at 8) |
+| `!sudoku level rotate` | Cycle through every level 1 → 20 |
 | `!sudoku variant windoku` | Set the type for upcoming puzzles (`classic`, `diagonal`, `windoku`, `centerdot`, `asterisk` or `mix`) |
 | `!sudoku hint` | Reveal one cell |
 | `!sudoku clearnotes` | Clear every viewer note on the board |
@@ -107,7 +128,8 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | Param | Default | Meaning |
 |---|---|---|
 | `channel` | — | Twitch channel to read |
-| `difficulty` | `rotate` | `1`–`10`, or `rotate`. `easy`/`medium`/`hard` still work (= 3/5/8) |
+| `mode` | `auto` | `auto` (adaptive), `fixed`, or `rotate` (cycle 1 → 20) |
+| `difficulty` | `7` | `1`–`20`: the level for `fixed`, or the starting level for `auto` |
 | `variant` | `mix` | `classic`, `diagonal`, `windoku`, `centerdot`, `asterisk`, or `mix` |
 | `prefix` | none | Require a prefix such as `!` (so `!B7 4`). Use this if moves are triggering from normal chat |
 | `hint` | `60` | Seconds without progress before a free hint (`0` = off) |

@@ -78,7 +78,8 @@ window.Sudoku = (() => {
         if (set.size >= 2) overlaps.push([a, b, set], [b, a, set]);
       }
     }
-    return (geoCache[key] = { key, ...VARIANTS[key], units, cellUnits, peers, overlaps });
+    const peerSet = peers.map((p) => new Set(p));
+    return (geoCache[key] = { key, ...VARIANTS[key], units, cellUnits, peers, peerSet, overlaps });
   }
 
   // ---------- Brute force ----------
@@ -100,8 +101,10 @@ window.Sudoku = (() => {
     return { best, bestMask };
   }
 
-  // Counts solutions up to `limit`.
-  function countSolutions(g, limit = 2, geo = geometry('classic')) {
+  // Counts solutions up to `limit`. `stats.nodes` (optional) counts search steps,
+  // a rough measure of how much trial and error a puzzle needs.
+  function countSolutions(g, limit = 2, geo = geometry('classic'), stats) {
+    if (stats) stats.nodes++;
     const { dead, best, bestMask } = pickCell(g, geo);
     if (dead) return 0;
     if (best === -1) return 1;
@@ -109,7 +112,7 @@ window.Sudoku = (() => {
     for (let v = 1; v <= 9; v++) {
       if (!(bestMask & bit(v))) continue;
       g[best] = v;
-      total += countSolutions(g, limit - total, geo);
+      total += countSolutions(g, limit - total, geo, stats);
       g[best] = 0;
       if (total >= limit) break;
     }
@@ -130,10 +133,10 @@ window.Sudoku = (() => {
 
   // ---------- Human-style grader ----------
   // Technique tiers: 1 singles, 2 locked candidates, 3 naked/hidden pairs &
-  // triples, 4 X-wing, 5 = needs more than that (or guessing).
-  const TECH_NAMES = ['', 'singles', 'locked candidates', 'pairs & triples', 'X-wing', 'beyond X-wing'];
+  // triples, 4 X-wing, 5 Swordfish & XY-wing, 6 = needs more (trial and error).
+  const TECH_NAMES = ['', 'singles', 'locked candidates', 'pairs & triples', 'X-wing', 'Swordfish / XY-wing', 'trial and error'];
 
-  function grade(puzzle, geo, cap = 4) {
+  function grade(puzzle, geo, cap = 5) {
     const val = puzzle.slice();
     const cand = new Array(81).fill(ALL);
     let left = 81;
@@ -202,31 +205,58 @@ window.Sudoku = (() => {
       return false;
     }
 
-    function xwing() {
+    // Fish: n rows (or columns) where v can only go in the same n columns (or rows).
+    // n = 2 is an X-wing, n = 3 a Swordfish.
+    function fish(n) {
       for (let v = 1; v <= 9; v++) {
         for (const [base, cross] of [[0, 9], [9, 0]]) {
           const lines = [];
           for (let l = 0; l < 9; l++) {
-            const idx = [];
-            geo.units[base + l].cells.forEach((c, k) => { if (!val[c] && cand[c] & bit(v)) idx.push(k); });
-            if (idx.length === 2) lines.push({ l, idx });
+            let m = 0;
+            geo.units[base + l].cells.forEach((c, k) => { if (!val[c] && cand[c] & bit(v)) m |= 1 << k; });
+            const k = bitCount(m);
+            if (k >= 2 && k <= n) lines.push({ l, m });
           }
-          for (let x = 0; x < lines.length; x++) {
-            for (let y = x + 1; y < lines.length; y++) {
-              const [p, q] = [lines[x], lines[y]];
-              if (p.idx[0] !== q.idx[0] || p.idx[1] !== q.idx[1]) continue;
-              for (const k of p.idx) {
-                const cells = geo.units[cross + k].cells.filter((_, n) => n !== p.l && n !== q.l);
-                if (eliminate(cells, bit(v))) return true;
-              }
+          if (lines.length < n) continue;
+          for (const set of combos(lines, n)) {
+            const m = set.reduce((a, x) => a | x.m, 0);
+            if (bitCount(m) !== n) continue;
+            const skip = new Set(set.map((x) => x.l));
+            for (let k = 0; k < 9; k++) {
+              if (!(m & (1 << k))) continue;
+              const cells = geo.units[cross + k].cells.filter((_, idx) => !skip.has(idx));
+              if (eliminate(cells, bit(v))) return true;
             }
           }
         }
       }
       return false;
     }
+    const xwing = () => fish(2);
 
-    const steps = [singles, locked, subsets, xwing];
+    // XY-wing: pivot {x,y} sees pincers {x,z} and {y,z}; z can go in neither cell both pincers see.
+    function xywing() {
+      const pairs = [];
+      for (let i = 0; i < 81; i++) if (!val[i] && bitCount(cand[i]) === 2) pairs.push(i);
+      for (const p of pairs) {
+        const wings = pairs.filter((c) => c !== p && geo.peerSet[p].has(c));
+        for (let a = 0; a < wings.length; a++) {
+          for (let b = a + 1; b < wings.length; b++) {
+            const A = wings[a], B = wings[b];
+            const ma = cand[A], mb = cand[B], mp = cand[p];
+            if (ma === mb || ma === mp || mb === mp) continue;
+            const z = ma & mb;
+            if (bitCount(z) !== 1 || z & mp || (ma | mb) & ~(mp | z)) continue;
+            const targets = geo.peers[A].filter((c) => c !== B && c !== p && geo.peerSet[B].has(c));
+            if (eliminate(targets, z)) return true;
+          }
+        }
+      }
+      return false;
+    }
+    const tier5 = () => fish(3) || xywing();
+
+    const steps = [singles, locked, subsets, xwing, tier5];
     let level = 1;
     while (left > 0) {
       let used = 0;
@@ -234,30 +264,42 @@ window.Sudoku = (() => {
       if (!used) break;
       level = Math.max(level, used);
     }
-    return { solved: left === 0, tech: left === 0 ? level : 5 };
+    return { solved: left === 0, tech: left === 0 ? level : 6, grid: val };
   }
 
-  // ---------- Difficulty levels (1-10) ----------
+  // ---------- Difficulty levels (1-20) ----------
   // clues: stop removing at this many givens. max: hardest technique allowed.
   // min: hardest technique we try to require (best effort within the time budget).
+  // search: also prefer puzzles that need the most trial and error.
+  const MAX_LEVEL = 20;
   const LEVELS = [
     null,
-    { name: 'Beginner', clues: 46, max: 1, min: 1 },
-    { name: 'Easy', clues: 40, max: 1, min: 1 },
+    { name: 'Beginner', clues: 48, max: 1, min: 1 },
+    { name: 'Novice', clues: 45, max: 1, min: 1 },
+    { name: 'Easy', clues: 42, max: 1, min: 1 },
+    { name: 'Easy+', clues: 39, max: 1, min: 1 },
     { name: 'Casual', clues: 36, max: 1, min: 1 },
+    { name: 'Steady', clues: 34, max: 1, min: 1 },
     { name: 'Medium', clues: 32, max: 1, min: 1 },
+    { name: 'Medium+', clues: 30, max: 1, min: 1 },
     { name: 'Tricky', clues: 29, max: 2, min: 1 },
+    { name: 'Tricky+', clues: 28, max: 2, min: 2 },
     { name: 'Hard', clues: 27, max: 2, min: 2 },
-    { name: 'Harder', clues: 26, max: 3, min: 3 },
-    { name: 'Expert', clues: 24, max: 4, min: 3 },
-    { name: 'Master', clues: 23, max: 4, min: 4 },
-    { name: 'Fiendish', clues: 0, max: 5, min: 5 },
+    { name: 'Hard+', clues: 26, max: 3, min: 3 },
+    { name: 'Harder', clues: 25, max: 3, min: 3 },
+    { name: 'Tough', clues: 24, max: 3, min: 3 },
+    { name: 'Expert', clues: 24, max: 4, min: 4 },
+    { name: 'Expert+', clues: 23, max: 4, min: 4 },
+    { name: 'Master', clues: 22, max: 5, min: 5 },
+    { name: 'Grandmaster', clues: 0, max: 5, min: 5 },
+    { name: 'Fiendish', clues: 0, max: 6, min: 6 },
+    { name: 'Nightmare', clues: 0, max: 6, min: 6, search: true, budget: 1500 },
   ];
-  const NAMED = { easy: 3, medium: 5, hard: 8, expert: 9 };
+  const NAMED = { easy: 5, medium: 9, hard: 13, expert: 15 };
   function toLevel(d) {
     if (typeof d === 'string' && NAMED[d.toLowerCase()]) return NAMED[d.toLowerCase()];
     const n = Math.round(Number(d));
-    return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 5;
+    return Number.isFinite(n) ? Math.min(MAX_LEVEL, Math.max(1, n)) : 9;
   }
 
   function attempt(L, geo) {
@@ -271,29 +313,34 @@ window.Sudoku = (() => {
       const cells = i === 40 ? [40] : [i, 80 - i];
       const keep = cells.map((c) => puzzle[c]);
       cells.forEach((c) => { puzzle[c] = 0; });
-      const ok = L.max >= 5 ? countSolutions(puzzle.slice(), 2, geo) === 1 : grade(puzzle, geo, L.max).solved;
+      const ok = L.max >= 6 ? countSolutions(puzzle.slice(), 2, geo) === 1 : grade(puzzle, geo, L.max).solved;
       if (ok) clues -= cells.length;
       else cells.forEach((c, k) => { puzzle[c] = keep[k]; });
     }
-    return { puzzle, solution, clues, tech: grade(puzzle, geo, 4).tech };
+    const tech = grade(puzzle, geo, 5).tech;
+    let cost = 0;
+    if (L.search) { const st = { nodes: 0 }; countSolutions(puzzle.slice(), 2, geo, st); cost = st.nodes; }
+    return { puzzle, solution, clues, tech, cost };
   }
 
   // Returns { puzzle, solution, level, variant, tech, clues } with a unique solution.
-  function generate(level = 5, variant = 'classic', budgetMs = 900) {
+  function generate(level = 9, variant = 'classic', budgetMs = 900) {
     level = toLevel(level);
     const L = LEVELS[level];
     const geo = geometry(variant);
+    const budget = L.budget || budgetMs;
     const t0 = performance.now();
     let best = null;
+    const better = (a, b) => a.tech !== b.tech ? a.tech > b.tech : a.cost !== b.cost ? a.cost > b.cost : a.clues < b.clues;
     do {
       const a = attempt(L, geo);
-      if (!best || a.tech > best.tech || (a.tech === best.tech && a.clues < best.clues)) best = a;
-      if (best.tech >= L.min) break;
-    } while (performance.now() - t0 < budgetMs);
+      if (!best || better(a, best)) best = a;
+      if (best.tech >= L.min && !L.search) break;
+    } while (performance.now() - t0 < budget);
     return { ...best, level, variant: geo.key };
   }
 
   const UNITS = { row: BASE.slice(0, 9).map((u) => u.cells), col: BASE.slice(9, 18).map((u) => u.cells), box: BASE.slice(18).map((u) => u.cells) };
 
-  return { generate, grade, countSolutions, geometry, toLevel, LEVELS, VARIANTS, VARIANT_ORDER, TECH_NAMES, UNITS, row, col, box };
+  return { generate, grade, countSolutions, geometry, toLevel, LEVELS, MAX_LEVEL, VARIANTS, VARIANT_ORDER, TECH_NAMES, UNITS, row, col, box };
 })();
