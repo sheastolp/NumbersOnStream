@@ -16,10 +16,10 @@ Prefer to run it from your own computer? The **offline download** is a paid extr
 
 The game is free to play, with every gameplay option. Paying unlocks only:
 
-- **Offline download**: the zip, to run the game from your own computer.
-- **Supporter bundle**: the offline download plus every ★ look: board themes (Neon Arcade, Green Terminal, Deep Ocean, Pastel Picnic, Ember Forge), solve celebrations (confetti, fireworks, gold coin shower), digit fonts (handwritten, rounded, storybook serif, pixel) and digit styles (glow, stamp).
+- **Offline download**: the zip, to run the game from your own computer. No ★ looks.
+- **Cosmetics bundle**: every ★ look, with no download: board themes (Neon Arcade, Green Terminal, Deep Ocean, Pastel Picnic, Ember Forge), solve celebrations (confetti, fireworks, gold coin shower), digit fonts (handwritten, rounded, storybook serif, pixel) and digit styles (glow, stamp). Works on the hosted copy and on a download.
 
-Looks never change how the game plays: no paid option touches puzzles, scoring, hints, timers, difficulty or commands. Try every look free in the demo; on stream, ★ looks need the Supporter licence key in the link (the setup screen adds it). See [LICENSING.md](LICENSING.md) for how licensing is set up.
+Looks never change how the game plays: no paid option touches puzzles, scoring, hints, timers, difficulty or commands. Try every look free in the demo; on stream, ★ looks need the Cosmetics bundle key in the link (the setup screen adds it). See [LICENSING.md](LICENSING.md) for how licensing is set up.
 
 ## Setup (OBS / Streamlabs)
 
@@ -177,7 +177,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `celebrate` | `none` | ★ `confetti`, `fireworks`, `coins` on the Solved screen |
 | `digits` | `standard` | ★ `hand`, `rounded`, `serif`, `pixel` |
 | `ink` | `plain` | ★ `glow`, `stamp` for numbers chat places |
-| `key` | — | Supporter licence key, needed for ★ options (not needed in the demo) |
+| `key` | — | Cosmetics bundle key, needed for ★ options (not needed in the demo) |
 
 ## Files
 

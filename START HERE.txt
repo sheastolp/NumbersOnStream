@@ -19,10 +19,10 @@ OPTIONAL: CONTROL PAGE (start/stop, difficulty, hints, scores)
   not visible". Right-click it > Interact to use the buttons.
   Keep it in a scene you never switch to, so it never shows on stream.
 
-LOOKS (SUPPORTER)
-  If you bought the Supporter bundle, paste your licence key into
-  "Supporter licence key" on the setup screen to use the * looks
-  (themes, celebrations, digit fonts). The game itself is the same either way.
+LOOKS (COSMETICS BUNDLE)
+  The * looks (themes, celebrations, digit fonts) are sold separately as
+  the Cosmetics bundle. If you have one, paste its key into "Cosmetics
+  bundle key" on the setup screen. The game itself is the same either way.
 
 No bot, no login and no account: the page reads your chat anonymously
 and never posts in it. Full guide: README.md or tavernworks.dev/sudoku
