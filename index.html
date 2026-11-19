@@ -14,12 +14,19 @@
       <p>Your chat solves a Sudoku together. This page only <em>reads</em> chat anonymously — no bot account or login needed.</p>
       <form id="setup-form">
         <label>Twitch channel <input name="channel" placeholder="yourchannel" required autocomplete="off"></label>
-        <label>Difficulty
-          <select name="difficulty">
-            <option value="rotate">Rotate (easy → medium → hard)</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+        <label><span>Difficulty: <b id="setup-level">5 · Tricky</b></span>
+          <input type="range" name="difficulty" min="1" max="10" step="1" value="5">
+          <span class="range-ends"><span>1 Beginner</span><span>10 Fiendish</span></span>
+        </label>
+        <label class="check"><input type="checkbox" name="rotate" value="1"> Rotate difficulty instead (3 → 5 → 8)</label>
+        <label>Puzzle type
+          <select name="variant">
+            <option value="mix">Mix it up (classic between twists)</option>
+            <option value="classic">Classic only</option>
+            <option value="diagonal">Diagonal: both diagonals have 1–9</option>
+            <option value="windoku">Windoku: 4 extra shaded boxes</option>
+            <option value="centerdot">Center Dot: box centers have 1–9</option>
+            <option value="asterisk">Asterisk: 9 starred cells have 1–9</option>
           </select>
         </label>
         <label>Command prefix <input name="prefix" placeholder="(none — just type B7 4)" autocomplete="off"></label>
@@ -50,6 +57,7 @@
         <div class="meta">
           <span id="round-no"></span>
           <span id="difficulty"></span>
+          <span id="variant" hidden></span>
           <span id="timer">0:00</span>
         </div>
         <div class="progress"><div id="progress-bar"></div></div>
@@ -58,6 +66,7 @@
 
       <section class="how">
         <h2>How to play</h2>
+        <p id="rule" class="rule" hidden></p>
         <p>Type a <b>cell</b> then a <b>number</b> in chat:</p>
         <div class="example"><span id="how-prefix"></span>B7 4</div>
         <p class="small">Also works: <code><span id="how-prefix2"></span>b7=4</code>. Right answer <b>+10</b>, finish a row / column / box <b>+5</b> each, wrong <b>−2</b> and a short timeout.</p>

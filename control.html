@@ -33,7 +33,15 @@
     button { font: inherit; font-weight: 700; border: 0; border-radius: 8px; padding: 12px 10px; background: var(--accent); color: #0f1020; cursor: pointer; }
     button:active { transform: scale(.97); }
     button.wide { grid-column: 1 / -1; }
-    button.easy { background: #4ade80; } button.medium { background: #ffcf5c; } button.hard { background: #ff7a93; }
+    .lvl { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .lvl b { font-size: 22px; color: var(--accent2); }
+    input[type=range] { width: 100%; padding: 0; accent-color: var(--accent); margin: 4px 0; }
+    input[type=range]:disabled { opacity: .4; }
+    .ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+    label.check input { flex: 0 0 auto; }
+    label.check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+    select { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    #var { font-size: 16px; }
     button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
     button.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
     button.danger.armed { background: var(--bad); color: #0f1020; }
@@ -55,7 +63,7 @@
       <h2>Current puzzle</h2>
       <div class="stats">
         <div><b id="round">—</b><small>Puzzle</small></div>
-        <div><b id="diff">—</b><small>Difficulty</small></div>
+        <div><b id="diff">—</b><small id="var">Difficulty</small></div>
         <div><b id="left">—</b><small>Cells left</small></div>
       </div>
       <div class="bar"><div id="bar"></div></div>
@@ -63,14 +71,24 @@
     </section>
 
     <section class="card">
-      <h2>Puzzle</h2>
+      <h2>Next puzzles</h2>
+      <div class="lvl"><span>Difficulty</span><b id="lvl-out">5 · Tricky</b></div>
+      <input id="lvl" type="range" min="1" max="10" step="1" value="5">
+      <div class="ends"><span>1 Beginner</span><span>10 Fiendish</span></div>
+      <label class="check"><input id="rot" type="checkbox"> Rotate 3 → 5 → 8</label>
+      <select id="variant">
+        <option value="mix">Mix it up (classic between twists)</option>
+        <option value="classic">Classic only</option>
+        <option value="diagonal">Diagonal</option>
+        <option value="windoku">Windoku</option>
+        <option value="centerdot">Center Dot</option>
+        <option value="asterisk">Asterisk</option>
+      </select>
       <div class="btns">
-        <button class="wide" data-cmd="new">New puzzle (next in rotation)</button>
-        <button class="easy" data-cmd="new" data-arg="easy">New easy</button>
-        <button class="medium" data-cmd="new" data-arg="medium">New medium</button>
-        <button class="hard" data-cmd="new" data-arg="hard">New hard</button>
-        <button class="ghost" data-cmd="hint">Reveal a hint</button>
+        <button class="wide" id="new-now">Start new puzzle now</button>
+        <button class="ghost wide" data-cmd="hint">Reveal a hint</button>
       </div>
+      <p class="hint">The slider and type apply to every puzzle after this one. "Start new puzzle now" skips the current one.</p>
     </section>
 
     <section class="card">
@@ -95,7 +113,10 @@
 
   <script>
     const LS_CMD = 'numbersonstream.cmd', LS_CUR = 'numbersonstream.current',
-          LS_STATUS = 'numbersonstream.status', LS_HEARTBEAT = 'numbersonstream.heartbeat';
+          LS_STATUS = 'numbersonstream.status', LS_HEARTBEAT = 'numbersonstream.heartbeat',
+          LS_SETTINGS = 'numbersonstream.settings';
+    const LEVEL_NAMES = ['', 'Beginner', 'Easy', 'Casual', 'Medium', 'Tricky', 'Hard', 'Harder', 'Expert', 'Master', 'Fiendish'];
+    const VARIANT_NAMES = { classic: 'Classic', diagonal: 'Diagonal', windoku: 'Windoku', centerdot: 'Center Dot', asterisk: 'Asterisk' };
     const $ = (s) => document.querySelector(s);
     const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
     let bc = null; try { bc = new BroadcastChannel('numbersonstream'); } catch {}
@@ -122,6 +143,35 @@
       });
     });
 
+    // ---- Difficulty slider / variant ----
+    const lvl = $('#lvl'), rot = $('#rot'), variant = $('#variant');
+    let touched = 0; // don't overwrite the controls right after the streamer changes them
+    function showLevel() {
+      lvl.disabled = rot.checked;
+      $('#lvl-out').textContent = rot.checked ? 'Rotating' : `${lvl.value} · ${LEVEL_NAMES[lvl.value]}`;
+    }
+    lvl.addEventListener('input', () => { touched = Date.now(); showLevel(); });
+    lvl.addEventListener('change', () => { touched = Date.now(); send('level', lvl.value, `Difficulty ${lvl.value} for next puzzles`); });
+    rot.addEventListener('change', () => {
+      touched = Date.now(); showLevel();
+      send('level', rot.checked ? 'rotate' : lvl.value, rot.checked ? 'Rotate difficulty' : `Difficulty ${lvl.value}`);
+    });
+    variant.addEventListener('change', () => { touched = Date.now(); send('variant', variant.value, `Puzzle type: ${variant.selectedOptions[0].text}`); });
+    $('#new-now').addEventListener('click', () => {
+      const v = variant.value === 'mix' ? '' : variant.value;
+      const l = rot.checked ? '' : lvl.value;
+      send('new', `${v} ${l}`.trim(), 'New puzzle');
+    });
+    function syncSettings() {
+      if (Date.now() - touched < 3000) return;
+      const st = read(LS_SETTINGS);
+      if (!st) return;
+      rot.checked = st.level === 'rotate';
+      if (st.level !== 'rotate') lvl.value = st.level;
+      if (st.variant) variant.value = st.variant;
+      showLevel();
+    }
+
     $('#chat-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const t = $('#chat-text').value.trim();
@@ -136,13 +186,16 @@
       const gs = $('#game-state');
       gs.textContent = live ? '● running' : '○ not found — is the game source loaded with the same kind of URL?';
       gs.className = 'dot ' + (live ? 'ok' : 'no');
+      syncSettings();
       const st = read(LS_STATUS);
       $('#chat-state').textContent = st ? st.text : '—';
       const s = read(LS_CUR);
       if (!s || !s.grid) return;
       const filled = s.grid.filter(Boolean).length;
       $('#round').textContent = '#' + s.round;
-      $('#diff').textContent = s.difficulty;
+      const level = s.level || ({ easy: 3, medium: 5, hard: 8 })[s.difficulty] || '—';
+      $('#diff').textContent = `Lv ${level}`;
+      $('#var').textContent = `${VARIANT_NAMES[s.variant] || 'Classic'} · ${LEVEL_NAMES[level] || ''}`;
       $('#left').textContent = 81 - filled;
       $('#bar').style.width = (filled / 81 * 100) + '%';
       const top = Object.values(s.scores || {}).sort((a, b) => b.points - a.points).slice(0, 5);

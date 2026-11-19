@@ -32,11 +32,43 @@ To try it with no chat at all, open `index.html?demo=1`. Fake viewers will play.
 
 Scores for the current puzzle and all-time scores (including wins) are saved in the browser source. The puzzle in progress is saved too, so refreshing the source doesn't lose it.
 
+## Difficulty (1–10)
+
+The difficulty slider on the setup screen and control page picks a level from 1 to 10. Each puzzle is graded by a solver that works like a person does, so the level reflects how hard the puzzle actually is to reason through, not just how many numbers are missing.
+
+| Level | Name | Givens | Hardest technique needed |
+|---|---|---|---|
+| 1–4 | Beginner, Easy, Casual, Medium | 46 → 32 | Singles only (one spot left, or one number left) |
+| 5 | Tricky | ~29 | Locked candidates (sometimes) |
+| 6 | Hard | ~27 | Locked candidates |
+| 7 | Harder | ~26 | Naked / hidden pairs and triples |
+| 8 | Expert | ~24 | Pairs and triples, sometimes X-wing |
+| 9 | Master | ~23 | X-wing when one turns up in time; otherwise the hardest found |
+| 10 | Fiendish | as few as possible | Beyond X-wing (chat will need to think hard) |
+
+`rotate` cycles levels 3 → 5 → 8. Every puzzle has exactly one solution, and the givens are placed symmetrically.
+
+## Puzzle types
+
+All types use the same 9×9 grid and the same `B7 4` chat input. The extra regions are shaded on the board, and the rule is shown in the side panel.
+
+| Type | Extra rule |
+|---|---|
+| Classic | none |
+| Diagonal | Both long diagonals contain 1–9 once |
+| Windoku | Four extra shaded 3×3 windows contain 1–9 once |
+| Center Dot | The nine box centres (●) contain 1–9 once |
+| Asterisk | The nine starred cells (★) contain 1–9 once |
+
+**Mix** (the default) alternates classic puzzles with each twist in turn. Completing an extra region scores the same +5 as a row, column or box.
+
 ## Streamer / mod commands (typed in chat)
 
 | Command | Effect |
 |---|---|
-| `!sudoku new` | New puzzle (optionally `!sudoku new hard`) |
+| `!sudoku new` | New puzzle. Optional type and/or level: `!sudoku new 7`, `!sudoku new diagonal`, `!sudoku new windoku 9` |
+| `!sudoku level 6` | Set the difficulty for upcoming puzzles (`1`–`10` or `rotate`) |
+| `!sudoku variant windoku` | Set the type for upcoming puzzles (`classic`, `diagonal`, `windoku`, `centerdot`, `asterisk` or `mix`) |
 | `!sudoku hint` | Reveal one cell |
 | `!sudoku resetscores` | Wipe all-time scores |
 
@@ -44,7 +76,7 @@ These only work for the broadcaster and moderators. In **Interact** mode you can
 
 ## Control page (`control.html`)
 
-This is a separate page with buttons for: new puzzle (choose the difficulty), reveal a hint, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
+This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
 
 Add it in OBS as a second Browser Source and keep it hidden. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
 
@@ -55,7 +87,8 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 | Param | Default | Meaning |
 |---|---|---|
 | `channel` | — | Twitch channel to read |
-| `difficulty` | `rotate` | `easy`, `medium`, `hard`, or `rotate` |
+| `difficulty` | `rotate` | `1`–`10`, or `rotate`. `easy`/`medium`/`hard` still work (= 3/5/8) |
+| `variant` | `mix` | `classic`, `diagonal`, `windoku`, `centerdot`, `asterisk`, or `mix` |
 | `prefix` | none | Require a prefix such as `!` (so `!B7 4`). Use this if moves are triggering from normal chat |
 | `hint` | `60` | Seconds without progress before a free hint (`0` = off) |
 | `cooldown` | `3` | Seconds a viewer waits after a wrong guess |
@@ -69,7 +102,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 
 - `index.html`: the page (setup screen and game)
 - `control.html`: streamer control panel
-- `js/sudoku.js`: puzzle generator. Every puzzle has exactly one solution.
+- `js/sudoku.js`: puzzle generator, variants and difficulty grader. Every puzzle has exactly one solution.
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering
 - `css/style.css`: styling

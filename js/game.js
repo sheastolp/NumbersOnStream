@@ -3,7 +3,8 @@
   const params = new URLSearchParams(location.search);
   const cfg = {
     channel: (params.get('channel') || '').trim(),
-    difficulty: (params.get('difficulty') || 'rotate').toLowerCase(),
+    difficulty: (params.get('difficulty') || 'rotate').toLowerCase(), // 1-10, easy/medium/hard, or rotate
+    variant: (params.get('variant') || 'mix').toLowerCase(), // classic, diagonal, windoku, centerdot, asterisk, or mix
     prefix: params.get('prefix') || '',
     hintAfter: num(params.get('hint'), 60), // seconds with no progress before a free cell is revealed (0 = off)
     cooldown: num(params.get('cooldown'), 3), // seconds a player waits after a wrong guess
@@ -15,12 +16,13 @@
   };
 
   const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
-  const ROTATION = ['easy', 'medium', 'hard'];
+  const ROTATION = [3, 5, 8]; // levels used by difficulty=rotate
   const LS_ALL = 'numbersonstream.alltime';
   const LS_CUR = 'numbersonstream.current';
   const LS_CMD = 'numbersonstream.cmd';
   const LS_STATUS = 'numbersonstream.status';
   const LS_HEARTBEAT = 'numbersonstream.heartbeat';
+  const LS_SETTINGS = 'numbersonstream.settings';
 
   function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
   const $ = (s) => document.querySelector(s);
@@ -39,6 +41,11 @@
       const u = new URL(location.href.split('?')[0]);
       for (const [k, v] of fd.entries()) if (v !== '') u.searchParams.set(k, v);
       if (!fd.get('bg')) u.searchParams.delete('bg');
+      u.searchParams.delete('rotate');
+      if (fd.get('rotate')) u.searchParams.set('difficulty', 'rotate');
+      const lv = +form.difficulty.value;
+      $('#setup-level').textContent = fd.get('rotate') ? 'Rotating 3 → 5 → 8' : `${lv} · ${Sudoku.LEVELS[lv].name}`;
+      form.difficulty.disabled = !!fd.get('rotate');
       out.value = u.toString();
     };
     form.addEventListener('input', update);
@@ -52,37 +59,82 @@
   if (cfg.transparent) document.body.classList.add('transparent');
 
   // ---------- State ----------
-  let state = null; // { puzzle, solution, grid, owners, scores, difficulty, round, startedAt, lastProgress }
+  let state = null; // { puzzle, solution, grid, owners, scores, level, variant, tech, mixIndex, round, startedAt, lastProgress }
   let allTime = store.get(LS_ALL, {});
   const cooldowns = new Map();
   let roundOver = false;
   let nextTimer = null;
 
-  function nextDifficulty() {
-    if (ROTATION.includes(cfg.difficulty)) return cfg.difficulty;
-    const prev = state ? ROTATION.indexOf(state.difficulty) : -1;
+  // Live settings for upcoming puzzles. Start from the URL; the control page and
+  // mod commands can change them. Saved overrides only apply while the URL is unchanged.
+  const urlSig = `${cfg.difficulty}|${cfg.variant}`;
+  let urlChanged = false;
+  const settings = (() => {
+    const s = store.get(LS_SETTINGS, null);
+    if (s && s.urlSig === urlSig) return s;
+    urlChanged = !!s;
+    return { urlSig, level: cfg.difficulty === 'rotate' ? 'rotate' : Sudoku.toLevel(cfg.difficulty), variant: validVariant(cfg.variant) ? cfg.variant : 'mix' };
+  })();
+  function validVariant(v) { return v === 'mix' || !!Sudoku.VARIANTS[v]; }
+  function saveSettings() { store.set(LS_SETTINGS, settings); }
+  saveSettings();
+
+  // Old saves stored 'easy'/'medium'/'hard'; map them onto 1-10.
+  function levelOf(s) { return s ? Sudoku.toLevel(s.level ?? s.difficulty) : 0; }
+
+  function nextLevel() {
+    if (settings.level !== 'rotate') return settings.level;
+    const prev = ROTATION.indexOf(levelOf(state));
     return ROTATION[(prev + 1) % ROTATION.length];
   }
 
-  function newRound(difficulty) {
+  function nextVariant() {
+    if (settings.variant !== 'mix') return settings.variant;
+    const order = Sudoku.VARIANT_ORDER;
+    const at = state && Number.isInteger(state.mixIndex) ? state.mixIndex : -1;
+    return { variant: order[(at + 1) % order.length], mixIndex: (at + 1) % order.length };
+  }
+
+  // "7", "diagonal", "diagonal 7", "hard windoku" ... -> { level, variant }
+  function parseNewArgs(arg) {
+    const out = {};
+    for (const w of String(arg || '').toLowerCase().split(/\s+/).filter(Boolean)) {
+      if (Sudoku.VARIANTS[w]) out.variant = w;
+      else if (/^\d+$/.test(w) || ['easy', 'medium', 'hard', 'expert'].includes(w)) out.level = Sudoku.toLevel(w);
+    }
+    return out;
+  }
+
+  function newRound(opts = {}) {
     clearInterval(nextTimer);
     roundOver = false;
     $('#overlay').classList.remove('show');
-    difficulty = difficulty || nextDifficulty();
-    const { puzzle, solution } = Sudoku.generate(difficulty);
+    const level = opts.level || nextLevel();
+    let variant = opts.variant, mixIndex = state ? state.mixIndex : undefined;
+    if (!variant) {
+      const v = nextVariant();
+      if (typeof v === 'string') variant = v; else ({ variant, mixIndex } = v);
+    }
+    const p = Sudoku.generate(level, variant);
     state = {
-      puzzle, solution,
-      grid: puzzle.slice(),
+      puzzle: p.puzzle, solution: p.solution,
+      grid: p.puzzle.slice(),
       owners: new Array(81).fill(null),
       scores: {},
-      difficulty,
+      level: p.level,
+      variant: p.variant,
+      tech: p.tech,
+      mixIndex,
       round: (state ? state.round : 0) + 1,
       startedAt: Date.now(),
       lastProgress: Date.now(),
     };
     save();
     renderAll();
-    feed({ type: 'system', text: `New ${state.difficulty} puzzle! Type a cell and a number, e.g. B7 4` });
+    const geo = Sudoku.geometry(state.variant);
+    const label = `${geo.key === 'classic' ? '' : geo.name + ' '}puzzle (level ${state.level} · ${Sudoku.LEVELS[state.level].name})`;
+    feed({ type: 'system', text: `New ${label}! Type a cell and a number, e.g. B7 4` });
+    if (geo.rule) feed({ type: 'system', text: `Twist: ${geo.rule}` });
   }
 
   function save() { store.set(LS_CUR, state); store.set(LS_ALL, allTime); }
@@ -147,7 +199,8 @@
   }
 
   function handleCommand(msg, text) {
-    const [, sub = '', arg = ''] = text.toLowerCase().split(/\s+/);
+    const [, sub = '', ...rest] = text.toLowerCase().split(/\s+/);
+    const arg = rest.join(' ');
     if (sub === 'score' || sub === 'rank') return; // reserved; scores are always on screen
     if (!(msg.isMod || msg.isBroadcaster)) return;
     runCommand(sub, arg);
@@ -155,7 +208,20 @@
 
   // Shared by mod chat commands, hotkeys and the control page.
   function runCommand(sub, arg) {
-    if (sub === 'new' || sub === 'skip') newRound(ROTATION.includes(arg) ? arg : undefined);
+    if (sub === 'new' || sub === 'skip') newRound(parseNewArgs(arg));
+    else if (sub === 'level' || sub === 'difficulty') {
+      const a = String(arg).trim().toLowerCase();
+      if (!a) return;
+      settings.level = a === 'rotate' ? 'rotate' : Sudoku.toLevel(a);
+      saveSettings();
+      feed({ type: 'system', text: settings.level === 'rotate' ? 'Difficulty will rotate 3 → 5 → 8' : `Next puzzles: level ${settings.level} · ${Sudoku.LEVELS[settings.level].name}` });
+    } else if (sub === 'variant') {
+      const a = String(arg).trim().toLowerCase();
+      if (!validVariant(a)) return;
+      settings.variant = a;
+      saveSettings();
+      feed({ type: 'system', text: a === 'mix' ? 'Variants will mix it up' : `Next puzzles: ${Sudoku.VARIANTS[a].name}` });
+    }
     else if (sub === 'hint') giveHint();
     else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
     else if (sub === 'resetround') {
@@ -173,15 +239,12 @@
     if (pts > 0 && pts >= POINTS.correct) { r.cells++; a.cells++; }
   }
 
-  function completedUnits(i) {
-    const out = [];
-    const check = (kind, u, label) => { if (Sudoku.UNITS[kind][u].every((j) => state.grid[j])) out.push(label); };
-    const r = Sudoku.row(i), c = Sudoku.col(i), b = Sudoku.box(i);
-    check('row', r, `row ${ROWS[r]}`);
-    check('col', c, `column ${c + 1}`);
-    check('box', b, 'box');
-    return out;
+  // Regions (rows, columns, boxes and variant regions) through cell i that are now full.
+  function fullUnits(i) {
+    const geo = Sudoku.geometry(state.variant);
+    return geo.cellUnits[i].map((u) => geo.units[u]).filter((u) => u.cells.every((j) => state.grid[j]));
   }
+  function completedUnits(i) { return fullUnits(i).map((u) => u.label); }
 
   function correct(player, mv) {
     state.grid[mv.index] = mv.value;
@@ -233,7 +296,8 @@
     save();
     renderBoards();
     const secs = Math.round((Date.now() - state.startedAt) / 1000);
-    $('#ov-time').textContent = `Solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
+    const geo = Sudoku.geometry(state.variant);
+    $('#ov-time').textContent = `${geo.name} · level ${state.level} — solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
     const list = $('#ov-list'); list.replaceChildren();
     top.slice(0, 5).forEach((p, idx) => list.append(row(idx + 1, p.name, p.color, `${p.points} pts · ${p.cells} cells`)));
     $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody — hints solved it!';
@@ -288,11 +352,7 @@
   }
 
   function flashUnits(i, count) {
-    const hits = [];
-    const r = Sudoku.row(i), c = Sudoku.col(i), b = Sudoku.box(i);
-    for (const [kind, u] of [['row', r], ['col', c], ['box', b]]) {
-      if (Sudoku.UNITS[kind][u].every((j) => state.grid[j])) hits.push(...Sudoku.UNITS[kind][u]);
-    }
+    const hits = fullUnits(i).flatMap((u) => u.cells);
     for (const j of new Set(hits)) { const el = cells[j].el; el.classList.remove('unit'); void el.offsetWidth; el.classList.add('unit'); }
   }
 
@@ -316,11 +376,21 @@
     if (!aa.length) a.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: '—' }));
   }
 
+  function tier(level) { return level <= 3 ? 'easy' : level <= 5 ? 'medium' : level <= 7 ? 'hard' : 'expert'; }
+
   function renderAll() {
+    const geo = Sudoku.geometry(state.variant);
+    cells.forEach(({ el }) => el.classList.remove('x-diag', 'x-win', 'x-dot', 'x-star'));
+    for (const u of geo.extra) for (const c of u.cells) cells[c].el.classList.add(u.cls);
+    $('#board').dataset.variant = geo.key;
     cells.forEach((_, i) => renderCell(i));
     $('#round-no').textContent = `Puzzle #${state.round}`;
-    $('#difficulty').textContent = state.difficulty;
-    $('#difficulty').dataset.level = state.difficulty;
+    $('#difficulty').textContent = `Lv ${state.level} · ${Sudoku.LEVELS[state.level].name}`;
+    $('#difficulty').dataset.level = tier(state.level);
+    $('#variant').textContent = geo.name;
+    $('#variant').hidden = geo.key === 'classic';
+    $('#rule').textContent = geo.rule;
+    $('#rule').hidden = !geo.rule;
     renderBoards();
   }
 
@@ -388,13 +458,15 @@
   $('#how-prefix').textContent = cfg.prefix;
   $('#how-prefix2').textContent = cfg.prefix;
   const saved = store.get(LS_CUR, null);
-  if (saved && saved.solution && saved.grid && !saved.grid.every(Boolean)) {
+  if (saved && saved.solution && saved.grid && !saved.grid.every(Boolean) && !urlChanged) {
     state = saved;
+    state.level = levelOf(saved);
+    state.variant = Sudoku.VARIANTS[saved.variant] ? saved.variant : 'classic';
     state.lastProgress = Date.now();
     renderAll();
     feed({ type: 'system', text: 'Puzzle restored — keep going!' });
   } else {
-    if (saved) state = saved; // keep round counter/difficulty rotation
+    if (saved) state = { ...saved, level: levelOf(saved) }; // keep round counter/rotation position
     newRound();
   }
   setInterval(tick, 250);
