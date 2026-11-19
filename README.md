@@ -91,11 +91,16 @@ These only work for the broadcaster and moderators. In **Interact** mode you can
 
 ## Control page (`control.html`)
 
-This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
+This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 10.
 
-Add it in OBS as a second Browser Source sized **1920 × 1080** and keep it hidden. The page is laid out for 1080p and scrolls on its own if it's taller than the window, even with OBS's default custom CSS. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
+Add it in OBS as a second Browser Source sized **1920 × 1080**, and uncheck "Shutdown source when not visible". The page is laid out for 1080p and scrolls if it's taller than the window.
 
-Load both sources the same way, as `file:///…` URLs in the URL field. The control page talks to the game through shared browser storage, so the two must have the same origin.
+OBS only draws a Browser Source while it's visible (eye icon on), and **Interact** shows a blank window for a hidden one. To keep it usable without it appearing on stream, either:
+
+- **Put it in its own scene** (e.g. "Sudoku Control") that you never switch to. Keep it visible there, then right-click it → **Interact**.
+- **Or keep it in your main scene but drag it off the canvas**, so its eye stays on but it's outside the area that gets streamed.
+
+Load both sources the same way, as `file:///…` URLs in the URL field (or both from the same website). The control page talks to the game through shared browser storage, so the two must have the same origin.
 
 ## URL options
 
