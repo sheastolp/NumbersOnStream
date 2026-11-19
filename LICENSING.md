@@ -53,15 +53,30 @@ Fill in `LICENSE_CONFIG` at the top of `js/license.js`:
 | `issuer` | The licensing site's host name (the tokens' `iss`). |
 | `store.cosmetics`, `store.supporter`, `store.offline` | The buy pages from step 3 and the prices to show on tavernworks.dev/sudoku. |
 | `accountUrl` | The `[lsvc_account]` page. |
+| `downloadUrl` | The download Worker, `https://downloads.tavernworks.dev/sudoku` (see below). Empty = downloads not open yet. |
 
 Then run `tools/package.sh ../tavernworks` to publish.
 
 ## Delivering the zip
 
-**The plugin doesn't deliver files yet.** Its purchase email sends the key and a link to the account page, but no download. Until it can, buyers need another way to get the zip. Options:
+The licensing service isn't ours and has no file downloads, so the zip is delivered by our own Cloudflare Worker, `cloudflare/sudoku-download-worker.js` in the tavernworks repo. It only uses the licensing service's public client API, like the game does:
 
-1. Add download support to the plugin (a file per product, a "Download" button on the account page and a link in the key email, served only to licences whose plan has the `offline` feature, i.e. Supporter and Offline download). This is the proper fix.
-2. Short term: use the plugin's `lsvc_email` filter to add a download link to the key email. The link can be shared, so keep it unlisted and change it now and then.
+1. On tavernworks.dev/sudoku ("Already bought something?"), the buyer enters their key and clicks **Download**.
+2. The Worker activates the key on the licensing service with a throwaway fingerprint (labelled "Download (tavernworks.dev)"), checks the signed token (signature, product, fingerprint, expiry) and that its features include `offline`, then deactivates it straight away, so no seat stays used.
+3. It streams the zip from a private R2 bucket. The page saves it as `sudoku-on-stream.zip`.
+
+There's never a public or shareable link, and a refunded or revoked key stops working at once. Cosmetics keys get a clear "doesn't include the download" message. If a key is already on its maximum number of setups, the buyer is asked to free one on their account page first (the download needs one for a moment).
+
+### Setting up the Worker (Cloudflare dashboard)
+
+1. **R2 → Create bucket**, e.g. `tavernworks-downloads`. Leave public access off.
+2. Upload the zip as `sudoku-on-stream.zip`: drag it into the bucket in the dashboard, or `npx wrangler r2 object put tavernworks-downloads/sudoku-on-stream.zip --file dist/sudoku-on-stream.zip --remote`. Do this again for every new version (`tools/package.sh` reminds you).
+3. **Workers → Create** a Worker named e.g. `sudoku-download` and paste in `cloudflare/sudoku-download-worker.js`.
+4. In the Worker's **Settings**:
+   - **Bindings → R2 bucket**: variable name `ZIPS`, the bucket from step 1.
+   - **Variables**: `LSVC_API` (the licensing API base, same as `api` in `js/license.js`), `LSVC_KEYS` (the `{ "kid": "public key" }` JSON, same as `publicKeys`), `LSVC_ISSUER` (same as `issuer`), `ALLOW_ORIGIN` = `https://tavernworks.dev`. None of these are secrets.
+   - **Domains & Routes**: add the custom domain `downloads.tavernworks.dev` (like `hunt.tavernworks.dev`).
+5. Set `downloadUrl` in `js/license.js` to `https://downloads.tavernworks.dev/sudoku` and run `tools/package.sh ../tavernworks`.
 
 `tools/package.sh` builds `dist/sudoku-on-stream.zip`. It never puts the zip on the public website.
 
