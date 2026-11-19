@@ -118,7 +118,7 @@ Add it as a second Browser Source sized **1920 × 1080**, uncheck "Shutdown sour
 | `prefix` | none | Require a prefix such as `!` (so `!B7 4`). Use this if moves are triggering from normal chat |
 | `hint` | `60` | Seconds without progress before a free hint (`0` = off) |
 | `cooldown` | `3` | Seconds a viewer waits after a wrong guess |
-| `next` | `30` | Seconds the end screen shows before the next puzzle |
+| `next` | `45` | Seconds the end screen shows before the next puzzle |
 | `max` | `3` | Max moves accepted per chat message |
 | `notes` | on | `0` turns off viewer notes |
 | `obs` | — | `1` = link to the control page through OBS WebSocket (needed for the dock) |

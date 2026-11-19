@@ -8,7 +8,7 @@
     prefix: params.get('prefix') || '',
     hintAfter: num(params.get('hint'), 60), // seconds with no progress before a free cell is revealed (0 = off)
     cooldown: num(params.get('cooldown'), 3), // seconds a player waits after a wrong guess
-    nextIn: num(params.get('next'), 30), // seconds between puzzles
+    nextIn: num(params.get('next'), 45), // seconds between puzzles
     maxPerMsg: num(params.get('max'), 3), // moves accepted from a single chat message
     demo: params.get('demo') === '1',
     test: params.get('test') === '1',
