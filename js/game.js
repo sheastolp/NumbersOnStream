@@ -13,6 +13,7 @@
     demo: params.get('demo') === '1',
     test: params.get('test') === '1',
     transparent: params.get('bg') === 'transparent',
+    notes: params.get('notes') !== '0', // viewers can pencil in notes, e.g. B7?35
   };
 
   const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
@@ -42,6 +43,7 @@
       for (const [k, v] of fd.entries()) if (v !== '') u.searchParams.set(k, v);
       if (!fd.get('bg')) u.searchParams.delete('bg');
       u.searchParams.delete('rotate');
+      if (fd.get('notes')) u.searchParams.delete('notes'); else u.searchParams.set('notes', '0');
       if (fd.get('rotate')) u.searchParams.set('difficulty', 'rotate');
       const lv = +form.difficulty.value;
       $('#setup-level').textContent = fd.get('rotate') ? 'Rotating 3 → 5 → 8' : `${lv} · ${Sudoku.LEVELS[lv].name}`;
@@ -119,6 +121,7 @@
     state = {
       puzzle: p.puzzle, solution: p.solution,
       grid: p.puzzle.slice(),
+      notes: new Array(81).fill(0), // pencil marks: bit v set = note v
       owners: new Array(81).fill(null),
       scores: {},
       level: p.level,
@@ -161,12 +164,31 @@
   // Accepts "B7 4", "b7=4", "B74", "!B7 4" and several moves per message.
   const MOVE_RE = /(?:^|[^A-Za-z0-9])([A-Ia-i])([1-9])\s*[=:\-]?\s*([1-9])(?![0-9])/g;
 
-  function parseMoves(text) {
-    let t = text.trim();
-    if (cfg.prefix) {
-      if (!t.toLowerCase().startsWith(cfg.prefix.toLowerCase())) return [];
-      t = t.slice(cfg.prefix.length);
+  // Notes: "B7?35" pencils in 3 and 5, "B7?-3" rubs out 3, "B7?x" (or "B7?0") clears the cell.
+  const NOTE_RE = /(?:^|[^A-Za-z0-9])([A-Ia-i])([1-9])\s*\?\s*(-?)\s*([1-9](?:[\s,]*[1-9]){0,8}|[0xX])(?![0-9A-Za-z])/g;
+
+  function stripPrefix(text) {
+    const t = text.trim();
+    if (!cfg.prefix) return t;
+    return t.toLowerCase().startsWith(cfg.prefix.toLowerCase()) ? t.slice(cfg.prefix.length) : null;
+  }
+
+  function parseNotes(text) {
+    const t = stripPrefix(text);
+    if (t === null || !cfg.notes) return [];
+    const out = [];
+    for (const m of t.matchAll(NOTE_RE)) {
+      const clear = /^[0x]$/i.test(m[4]);
+      const mask = clear ? 0 : [...m[4].replace(/[^1-9]/g, '')].reduce((a, d) => a | (1 << +d), 0);
+      out.push({ index: ROWS.indexOf(m[1].toUpperCase()) * 9 + (+m[2] - 1), op: clear ? 'clear' : m[3] ? 'remove' : 'add', mask });
+      if (out.length >= cfg.maxPerMsg) break;
     }
+    return out;
+  }
+
+  function parseMoves(text) {
+    const t = stripPrefix(text);
+    if (t === null) return [];
     const moves = [];
     for (const m of t.matchAll(MOVE_RE)) {
       moves.push({ index: ROWS.indexOf(m[1].toUpperCase()) * 9 + (+m[2] - 1), value: +m[3], label: m[1].toUpperCase() + m[2] });
@@ -179,8 +201,10 @@
     const text = msg.text.trim();
     if (/^!sudoku\b/i.test(text)) return handleCommand(msg, text);
     if (roundOver || !state) return;
+    const notes = parseNotes(text);
+    if (notes.length) applyNotes(notes);
     const moves = parseMoves(text);
-    if (!moves.length) return;
+    if (!moves.length) { if (notes.length) save(); return; }
     const now = Date.now();
     if ((cooldowns.get(msg.user) || 0) > now) return;
     const player = { user: msg.user, name: msg.displayName, color: readableColor(msg.color, msg.user) };
@@ -224,9 +248,39 @@
     }
     else if (sub === 'hint') giveHint();
     else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
+    else if (sub === 'clearnotes') { clearAllNotes(); feed({ type: 'system', text: 'All notes cleared' }); }
     else if (sub === 'resetround') {
       if (state) { state.scores = {}; save(); renderBoards(); feed({ type: 'system', text: 'Scores for this puzzle reset' }); }
     }
+  }
+
+  // ---------- Notes ----------
+  // Shared by the whole chat; never scored or checked, just a scratchpad.
+  function applyNotes(list) {
+    for (const n of list) {
+      if (state.grid[n.index]) continue;
+      const before = state.notes[n.index];
+      if (n.op === 'clear') state.notes[n.index] = 0;
+      else if (n.op === 'remove') state.notes[n.index] &= ~n.mask;
+      else state.notes[n.index] |= n.mask;
+      if (state.notes[n.index] !== before) renderCell(n.index, 'noted');
+    }
+  }
+
+  // When a cell is filled: wipe its notes and rub that number out of every cell it now rules out.
+  function cleanNotes(i) {
+    const v = state.grid[i];
+    state.notes[i] = 0;
+    for (const p of Sudoku.geometry(state.variant).peers[i]) {
+      if (state.notes[p] & (1 << v)) { state.notes[p] &= ~(1 << v); renderCell(p); }
+    }
+  }
+
+  function clearAllNotes() {
+    if (!state) return;
+    state.notes = new Array(81).fill(0);
+    cells.forEach((_, i) => renderCell(i));
+    save();
   }
 
   // ---------- Scoring ----------
@@ -250,6 +304,7 @@
     state.grid[mv.index] = mv.value;
     state.owners[mv.index] = { name: player.name, color: player.color };
     state.lastProgress = Date.now();
+    cleanNotes(mv.index);
     let pts = POINTS.correct;
     const units = completedUnits(mv.index);
     pts += units.length * POINTS.unit;
@@ -281,6 +336,7 @@
     state.grid[i] = state.solution[i];
     state.owners[i] = { hint: true };
     state.lastProgress = Date.now();
+    cleanNotes(i);
     renderCell(i, 'pop');
     feed({ type: 'system', text: `Hint: ${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} = ${state.solution[i]}` });
     save();
@@ -329,9 +385,11 @@
         const numEl = document.createElement('span'); numEl.className = 'num';
         const who = document.createElement('span'); who.className = 'who';
         const coord = document.createElement('span'); coord.className = 'coord'; coord.textContent = ROWS[r] + (c + 1);
-        el.append(coord, numEl, who);
+        const notesEl = document.createElement('div'); notesEl.className = 'notes';
+        for (let d = 1; d <= 9; d++) { const s = document.createElement('span'); s.textContent = d; notesEl.append(s); }
+        el.append(coord, notesEl, numEl, who);
         board.append(el);
-        cells.push({ el, num: numEl, who });
+        cells.push({ el, num: numEl, who, notes: notesEl });
       }
     }
   }
@@ -348,6 +406,9 @@
     n.style.color = owner && !owner.hint ? owner.color : '';
     who.textContent = owner ? (owner.hint ? 'hint' : owner.name) : '';
     who.style.color = owner && !owner.hint ? owner.color : '';
+    const mask = v ? 0 : (state.notes && state.notes[i]) || 0;
+    el.classList.toggle('has-notes', !!mask);
+    [...cells[i].notes.children].forEach((s, k) => s.classList.toggle('on', !!(mask & (1 << (k + 1)))));
     if (anim) { el.classList.remove(anim); void el.offsetWidth; el.classList.add(anim); }
   }
 
@@ -457,11 +518,14 @@
   buildBoard();
   $('#how-prefix').textContent = cfg.prefix;
   $('#how-prefix2').textContent = cfg.prefix;
+  document.querySelectorAll('.how-prefix-n').forEach((e) => { e.textContent = cfg.prefix; });
+  $('#how-notes').hidden = !cfg.notes;
   const saved = store.get(LS_CUR, null);
   if (saved && saved.solution && saved.grid && !saved.grid.every(Boolean) && !urlChanged) {
     state = saved;
     state.level = levelOf(saved);
     state.variant = Sudoku.VARIANTS[saved.variant] ? saved.variant : 'classic';
+    if (!Array.isArray(state.notes)) state.notes = new Array(81).fill(0);
     state.lastProgress = Date.now();
     renderAll();
     feed({ type: 'system', text: 'Puzzle restored — keep going!' });
@@ -492,6 +556,12 @@
       const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
       if (!empty.length) return;
       const i = empty[Math.floor(Math.random() * empty.length)];
+      if (cfg.notes && Math.random() < 0.3) {
+        const other = ((state.solution[i] + Math.floor(Math.random() * 8)) % 9) + 1;
+        const ds = Math.random() < 0.5 ? `${state.solution[i]}${other}` : `${other}${state.solution[i]}`;
+        handleChat({ user: bots[k].toLowerCase(), displayName: bots[k], color: colors[k], text: `${cfg.prefix}${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1}?${ds}` });
+        return;
+      }
       const good = Math.random() < 0.75;
       const v = good ? state.solution[i] : ((state.solution[i] + Math.floor(Math.random() * 8)) % 9) + 1;
       const variants = [`${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} ${v}`, `${ROWS[Sudoku.row(i)].toLowerCase()}${Sudoku.col(i) + 1}=${v}`, `ok ${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} ${v} i think`];
@@ -509,5 +579,5 @@
     });
   }
 
-  window.__sudokuOnStream = { handleChat, get state() { return state; }, parseMoves, newRound, giveHint };
+  window.__sudokuOnStream = { handleChat, get state() { return state; }, parseMoves, parseNotes, newRound, giveHint };
 })();

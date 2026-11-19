@@ -23,6 +23,20 @@ To try it with no chat at all, open `index.html?demo=1`. Fake viewers will play.
 | `B7 4` (or `b7=4`, `B74`, `ok B7 4 i think`) | Puts a 4 in row B, column 7 |
 | `A1 5 C3 2` | Several moves in one message (up to 3) |
 
+### Notes (pencil marks)
+
+Chat shares one set of pencil marks. Viewers can jot down which numbers might go in a cell without guessing:
+
+| Chat message | What happens |
+|---|---|
+| `B7?35` (or `B7? 3 5`, `b7?3,5`) | Pencils small 3 and 5 into B7 |
+| `B7?-3` | Rubs out the 3 |
+| `B7?x` (or `B7?0`) | Clears all notes in B7 |
+
+Notes are free: they're never checked and never score. When a number is placed, that cell's notes disappear, and the number is rubbed out of the notes in every cell it now rules out. Mods can type `!sudoku clearnotes` to wipe them all. Turn notes off with `notes=0` in the URL, or untick the box on the setup screen.
+
+### Scoring
+
 - Right answer: **+10**
 - Completing a row, column or 3×3 box: **+5** each
 - Placing the last cell of the puzzle: **+10**
@@ -70,13 +84,14 @@ All types use the same 9×9 grid and the same `B7 4` chat input. The extra regio
 | `!sudoku level 6` | Set the difficulty for upcoming puzzles (`1`–`10` or `rotate`) |
 | `!sudoku variant windoku` | Set the type for upcoming puzzles (`classic`, `diagonal`, `windoku`, `centerdot`, `asterisk` or `mix`) |
 | `!sudoku hint` | Reveal one cell |
+| `!sudoku clearnotes` | Clear every viewer note on the board |
 | `!sudoku resetscores` | Wipe all-time scores |
 
 These only work for the broadcaster and moderators. In **Interact** mode you can also press **N** for a new puzzle or **H** for a hint.
 
 ## Control page (`control.html`)
 
-This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
+This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
 
 Add it in OBS as a second Browser Source and keep it hidden. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
 
@@ -94,6 +109,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 | `cooldown` | `3` | Seconds a viewer waits after a wrong guess |
 | `next` | `20` | Seconds between puzzles |
 | `max` | `3` | Max moves accepted per chat message |
+| `notes` | on | `0` turns off viewer notes |
 | `bg` | — | `transparent` for a see-through background |
 | `demo` | — | `1` = simulated viewers |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |

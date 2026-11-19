@@ -86,7 +86,8 @@
       </select>
       <div class="btns">
         <button class="wide" id="new-now">Start new puzzle now</button>
-        <button class="ghost wide" data-cmd="hint">Reveal a hint</button>
+        <button class="ghost" data-cmd="hint">Reveal a hint</button>
+        <button class="ghost" data-cmd="clearnotes">Clear all notes</button>
       </div>
       <p class="hint">The slider and type apply to every puzzle after this one. "Start new puzzle now" skips the current one.</p>
     </section>
@@ -103,7 +104,7 @@
     <section class="card">
       <h2>Play as streamer</h2>
       <form id="chat-form">
-        <input id="chat-text" placeholder="e.g. B7 4" autocomplete="off">
+        <input id="chat-text" placeholder="e.g. B7 4 or B7?35" autocomplete="off">
         <button>Send</button>
       </form>
       <p class="hint">Counts as a move from you, without typing in Twitch chat.</p>
