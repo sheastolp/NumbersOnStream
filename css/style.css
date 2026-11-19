@@ -43,12 +43,6 @@ body.setup-mode #game { display: none; }
 #setup-form input:not([type=checkbox]), #setup-form select {
   font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%;
 }
-.obs-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0; display: grid; gap: 10px; }
-.obs-box .obs-fields { display: none; gap: 10px; }
-.obs-box.on .obs-fields { display: grid; }
-.small-note { margin: 0; font-size: 13px; }
-.row2 { display: grid; grid-template-columns: 1fr 120px; gap: 12px; }
-@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
 .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 560px) { .row3 { grid-template-columns: 1fr; } }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }

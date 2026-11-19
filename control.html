@@ -73,7 +73,6 @@
   <div class="status">
     <span>Game source: <span id="game-state" class="dot no">○ not found</span></span>
     <span>Chat: <span id="chat-state">—</span></span>
-    <span id="obs-wrap" hidden>OBS link: <span id="obs-state" class="dot">○ connecting…</span></span>
   </div>
 
   <div class="grid">
@@ -131,7 +130,6 @@
   <div id="log"></div>
 
 </div>
-  <script src="js/obsbridge.js"></script>
   <script>
     const LS_CMD = 'numbersonstream.cmd', LS_CUR = 'numbersonstream.current',
           LS_STATUS = 'numbersonstream.status', LS_HEARTBEAT = 'numbersonstream.heartbeat',
@@ -142,27 +140,10 @@
     const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
     let bc = null; try { bc = new BroadcastChannel('numbersonstream'); } catch {}
 
-    // Optional OBS WebSocket link (?obs=1): lets this page run as an OBS Custom
-    // Browser Dock (or anywhere else) instead of a hidden Browser Source.
-    let remote = null; // latest snapshot from the game over OBS WebSocket
-    const obsCfg = ObsBridge.fromParams(new URLSearchParams(location.search));
-    const bridge = obsCfg && ObsBridge.connect({
-      ...obsCfg,
-      onMessage: (m) => { if (m.kind === 'state') { remote = { ...m, receivedAt: Date.now() }; refresh(); } },
-      onStatus: (st, detail) => {
-        const el = $('#obs-state');
-        el.textContent = st === 'connected' ? '● connected' : st === 'connecting' ? '○ connecting…' : `○ ${detail || 'disconnected'} — is OBS open with WebSocket enabled?`;
-        el.className = 'dot ' + (st === 'connected' ? 'ok' : st === 'connecting' ? '' : 'no');
-        if (st === 'connected') bridge && bridge.send({ kind: 'hello' });
-      },
-    });
-    if (obsCfg) $('#obs-wrap').hidden = false;
-
     function send(cmd, arg, label) {
       const c = { id: Math.random().toString(36).slice(2) + Date.now(), cmd, arg: arg || '', t: Date.now() };
       try { localStorage.setItem(LS_CMD, JSON.stringify(c)); } catch {}
       if (bc) bc.postMessage(c);
-      if (bridge) bridge.send({ kind: 'cmd', ...c });
       $('#log').textContent = `Sent: ${label}`;
       setTimeout(refresh, 300);
     }
@@ -200,8 +181,9 @@
       const l = rot.checked ? '' : lvl.value;
       send('new', `${v} ${l}`.trim(), 'New puzzle');
     });
-    function syncSettings(st) {
+    function syncSettings() {
       if (Date.now() - touched < 3000) return;
+      const st = read(LS_SETTINGS);
       if (!st) return;
       rot.checked = st.level === 'rotate';
       if (st.level !== 'rotate') lvl.value = st.level;
@@ -217,42 +199,25 @@
       $('#chat-text').value = '';
     });
 
-    // One view of the game, from OBS WebSocket if it's live, else from shared storage.
-    function snapshot() {
-      if (remote && Date.now() - remote.receivedAt < 4000) return remote;
-      const s = read(LS_CUR);
-      return {
-        beat: +localStorage.getItem(LS_HEARTBEAT) || 0,
-        status: read(LS_STATUS),
-        settings: read(LS_SETTINGS),
-        cur: s && s.grid ? {
-          round: s.round, level: s.level, difficulty: s.difficulty, variant: s.variant,
-          filled: s.grid.filter(Boolean).length,
-          top: Object.values(s.scores || {}).sort((a, b) => b.points - a.points).slice(0, 10),
-        } : null,
-      };
-    }
-
     function refresh() {
-      const snap = snapshot();
-      const live = snap === remote || Date.now() - snap.beat < 4000;
+      const beat = +localStorage.getItem(LS_HEARTBEAT) || 0;
+      const live = Date.now() - beat < 4000;
       const gs = $('#game-state');
-      gs.textContent = live ? '● running' : obsCfg
-        ? '○ not found — does the game source URL also have the OBS link turned on?'
-        : '○ not found — is the game source loaded with the same kind of URL?';
+      gs.textContent = live ? '● running' : '○ not found — is the game source loaded with the same kind of URL?';
       gs.className = 'dot ' + (live ? 'ok' : 'no');
-      if (snap.settings) syncSettings(snap.settings);
-      $('#chat-state').textContent = snap.status ? snap.status.text : '—';
-      const s = snap.cur;
-      if (!s) return;
-      const filled = s.filled;
+      syncSettings();
+      const st = read(LS_STATUS);
+      $('#chat-state').textContent = st ? st.text : '—';
+      const s = read(LS_CUR);
+      if (!s || !s.grid) return;
+      const filled = s.grid.filter(Boolean).length;
       $('#round').textContent = '#' + s.round;
       const level = s.level || ({ easy: 3, medium: 5, hard: 8 })[s.difficulty] || '—';
       $('#diff').textContent = `Lv ${level}`;
       $('#var').textContent = `${VARIANT_NAMES[s.variant] || 'Classic'} · ${LEVEL_NAMES[level] || ''}`;
       $('#left').textContent = 81 - filled;
       $('#bar').style.width = (filled / 81 * 100) + '%';
-      const top = s.top || [];
+      const top = Object.values(s.scores || {}).sort((a, b) => b.points - a.points).slice(0, 10);
       const ol = $('#top'); ol.replaceChildren();
       for (const p of top) {
         const li = document.createElement('li');

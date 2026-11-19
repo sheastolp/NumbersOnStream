@@ -45,19 +45,6 @@
       u.searchParams.delete('rotate');
       if (fd.get('notes')) u.searchParams.delete('notes'); else u.searchParams.set('notes', '0');
       if (fd.get('rotate')) u.searchParams.set('difficulty', 'rotate');
-      // OBS WebSocket link: same settings go on both the game and control URLs.
-      const c = new URL('control.html', u);
-      const useObs = !!fd.get('obs');
-      form.querySelector('.obs-box').classList.toggle('on', useObs);
-      for (const k of ['obs', 'obspass', 'obsport']) u.searchParams.delete(k);
-      if (useObs) {
-        for (const x of [u, c]) {
-          x.searchParams.set('obs', '1');
-          if (fd.get('obspass')) x.searchParams.set('obspass', fd.get('obspass'));
-          if (fd.get('obsport') && fd.get('obsport') !== '4455') x.searchParams.set('obsport', fd.get('obsport'));
-        }
-      }
-      $('#setup-control-url').value = c.toString();
       const lv = +form.difficulty.value;
       $('#setup-level').textContent = fd.get('rotate') ? 'Rotating 3 → 5 → 8' : `${lv} · ${Sudoku.LEVELS[lv].name}`;
       form.difficulty.disabled = !!fd.get('rotate');
@@ -66,7 +53,6 @@
     form.addEventListener('input', update);
     form.addEventListener('submit', (e) => { e.preventDefault(); update(); location.href = out.value; });
     $('#setup-copy').addEventListener('click', () => { update(); out.select(); navigator.clipboard?.writeText(out.value); });
-    $('#setup-copy-control').addEventListener('click', () => { update(); const c = $('#setup-control-url'); c.select(); navigator.clipboard?.writeText(c.value); });
     $('#setup-demo').addEventListener('click', () => { location.search = '?demo=1'; });
     update();
     return;
@@ -518,9 +504,8 @@
   // control.html sends commands through localStorage (storage event) and a
   // BroadcastChannel; both reach every page of the same origin in OBS.
   const seenCmds = new Set();
-  function onControl(c, remote) {
-    // Remote commands can come from another device whose clock differs, so only de-dupe those.
-    if (!c || !c.id || seenCmds.has(c.id) || (!remote && Date.now() - c.t > 10000)) return;
+  function onControl(c) {
+    if (!c || !c.id || seenCmds.has(c.id) || Date.now() - c.t > 10000) return;
     seenCmds.add(c.id);
     if (c.cmd === 'chat') handleChat({ user: 'streamer', displayName: c.name || 'Streamer', color: '#FFD700', isBroadcaster: true, isMod: true, text: String(c.arg || '') });
     else runCommand(c.cmd, c.arg || '');
@@ -528,25 +513,6 @@
   window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
   try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
   setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
-
-  // Optional OBS WebSocket link (?obs=1), so the control page can run as an OBS
-  // dock, in a normal browser or on another device.
-  const obsCfg = ObsBridge.fromParams(params);
-  if (obsCfg) {
-    const bridge = ObsBridge.connect({
-      ...obsCfg,
-      onMessage: (m) => { if (m.kind === 'cmd') onControl(m, true); else if (m.kind === 'hello') sendSnapshot(); },
-    });
-    function sendSnapshot() {
-      if (!state) return;
-      const top = ranked(state.scores).slice(0, 10).map(({ name, color, points }) => ({ name, color, points }));
-      bridge.send({
-        kind: 'state', beat: Date.now(), status: store.get(LS_STATUS, null), settings,
-        cur: { round: state.round, level: state.level, variant: state.variant, filled: state.grid.filter(Boolean).length, top },
-      });
-    }
-    setInterval(sendSnapshot, 1000);
-  }
 
   // ---------- Boot ----------
   buildBoard();
