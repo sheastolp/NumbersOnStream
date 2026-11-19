@@ -26,3 +26,6 @@ LOOKS (SUPPORTER)
 
 No bot, no login and no account: the page reads your chat anonymously
 and never posts in it. Full guide: README.md or tavernworks.dev/sudoku
+
+This download is for your own streams; please don't share it or your key.
+See LICENCE.txt, and tavernworks.dev/terms for the full terms.

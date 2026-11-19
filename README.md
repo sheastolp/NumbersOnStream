@@ -191,6 +191,11 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 - `css/style.css`: styling
 
 - `START HERE.txt`: short setup steps for people who downloaded the zip
+- `LICENCE.txt`: the licence for the paid download (all rights reserved; full terms at [tavernworks.dev/terms](https://tavernworks.dev/terms/))
 - `tools/package.sh`: builds `dist/sudoku-on-stream.zip` (the paid download, for the licensing service); given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/`. It never puts the zip on the site.
 
 It uses plain HTML/JS with no build step and no dependencies, so it works straight from disk (`file://`).
+
+## Licence
+
+Copyright © 2026 Tavernworks. All rights reserved. Sudoku on Stream is not open source; see [LICENCE.txt](LICENCE.txt) and the [Terms of Service](https://tavernworks.dev/terms/).

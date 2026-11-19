@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="$(tr -d '[:space:]' < VERSION)"
-FILES=(index.html control.html css js README.md "START HERE.txt" VERSION)
+FILES=(index.html control.html css js README.md "START HERE.txt" LICENCE.txt VERSION)
 
 rm -rf dist
 mkdir -p "dist/sudoku-on-stream"
