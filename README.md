@@ -51,7 +51,7 @@ Chat shares one set of pencil marks. Viewers can jot down which numbers might go
 
 One empty cell always has a dashed outline and shows its real notes: every number that can still go there. The How to play panel shows the exact command that makes those notes (for example `G1?235`), so chat always has a correct example on screen. When that cell is filled, the example moves to another empty cell. Chat can't change the example cell's notes.
 
-Notes are free: they're never checked and never score. When a number is placed, that cell's notes disappear, and the number is rubbed out of the notes in every cell it now rules out. Mods can type `!sudoku clearnotes` to wipe them all. Turn notes off with `notes=0` in the URL, or untick the box on the setup screen.
+Notes are never checked and never score. When a number is placed, that cell's notes disappear, and the number is rubbed out of the notes in every cell it now rules out. Mods can type `!sudoku clearnotes` to wipe them all. Turn notes off with `notes=0` in the URL, or untick the box on the setup screen.
 
 ### Scoring
 
@@ -59,7 +59,7 @@ Notes are free: they're never checked and never score. When a number is placed, 
 - Completing a row, column or 3×3 box: **+5** each
 - Placing the last cell of the puzzle: **+10**
 - Wrong answer: **−2**, plus a short cooldown for that viewer (default 3 s)
-- If nobody gets a correct answer for 60 s, a free hint cell is revealed. The bar under the title counts down to it: full after every correct answer, turning gold then red as the hint gets close. (With hints off, `hint=0`, the bar shows puzzle progress instead.)
+- If nobody gets a correct answer for 60 s, a hint cell is revealed. The bar under the title counts down to it: full after every correct answer, turning gold then red as the hint gets close. (With hints off, `hint=0`, the bar shows puzzle progress instead.)
 - When the puzzle is solved, an MVP screen shows, then a new puzzle starts.
 
 Scores for the current puzzle and all-time scores (including wins) are saved in the browser source. The puzzle in progress is saved too, so refreshing the source doesn't lose it.
@@ -155,7 +155,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `difficulty` | `7` | `1`–`20`: the level for `fixed`, or the starting level for `auto` |
 | `variant` | `mix` | `classic`, `diagonal`, `windoku`, `centerdot`, `asterisk`, or `mix` |
 | `prefix` | none | Require a prefix such as `!` (so `!B7 4`). Use this if moves are triggering from normal chat |
-| `hint` | `60` | Seconds without progress before a free hint (`0` = off) |
+| `hint` | `60` | Seconds without progress before an automatic hint (`0` = off) |
 | `cooldown` | `3` | Seconds a viewer waits after a wrong guess |
 | `next` | `45` | Seconds the end screen shows before the next puzzle |
 | `max` | `3` | Max moves accepted per chat message |
