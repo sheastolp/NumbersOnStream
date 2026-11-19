@@ -2,9 +2,12 @@
 # Packages Sudoku on Stream for the public.
 #
 #   tools/package.sh                     builds dist/sudoku-on-stream.zip
-#   tools/package.sh ../tavernworks      also publishes it to the website:
-#                                        the hosted game at /sudoku/play/ and
-#                                        the zip at /sudoku/sudoku-on-stream.zip
+#   tools/package.sh ../tavernworks      also publishes the hosted game to the
+#                                        website at /sudoku/play/
+#
+# The zip is the paid offline download: upload it to the licensing service
+# as the file for the offline and Supporter products. It is never copied to
+# the website, which is public.
 #
 # The game has no build step; this only copies the files people need.
 set -euo pipefail
@@ -26,6 +29,7 @@ if [ $# -ge 1 ]; then
   rm -rf "$PLAY"
   mkdir -p "$PLAY"
   cp -r index.html control.html css js VERSION "$PLAY/"
-  cp dist/sudoku-on-stream.zip "$SITE/sudoku/sudoku-on-stream.zip"
-  echo "Published v$VERSION to $SITE/sudoku/ (play/ and sudoku-on-stream.zip)"
+  rm -f "$SITE/sudoku/sudoku-on-stream.zip" # the download is paid now; never publish it
+  echo "Published v$VERSION to $SITE/sudoku/play/"
+  echo "Upload dist/sudoku-on-stream.zip to the licensing service as the offline download."
 fi

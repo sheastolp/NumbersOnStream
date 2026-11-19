@@ -10,7 +10,16 @@ Viewers type a cell and a number in chat, for example `B7 4`. Correct answers ap
 
 Go to **[tavernworks.dev/sudoku](https://tavernworks.dev/sudoku/)**, type your channel name, and paste the link it gives you into an OBS Browser Source (1920 × 1080). The page has the full step-by-step guide.
 
-Prefer to run it from your own computer? Download **[sudoku-on-stream.zip](https://tavernworks.dev/sudoku/sudoku-on-stream.zip)**, unzip it, and open `START HERE.txt`.
+Prefer to run it from your own computer? The **offline download** is a paid extra (see [Paid extras](#paid-extras)). Unzip it and open `START HERE.txt`.
+
+## Paid extras
+
+The game is free to play, with every gameplay option. Paying unlocks only:
+
+- **Offline download**: the zip, to run the game from your own computer.
+- **Supporter bundle**: the offline download plus every ★ look: board themes (Neon Arcade, Green Terminal, Deep Ocean, Pastel Picnic, Ember Forge), solve celebrations (confetti, fireworks, gold coin shower), digit fonts (handwritten, rounded, storybook serif, pixel) and digit styles (glow, stamp).
+
+Looks never change how the game plays: no paid option touches puzzles, scoring, hints, timers, difficulty or commands. Try every look free in the demo; on stream, ★ looks need the Supporter licence key in the link (the setup screen adds it). See [LICENSING.md](LICENSING.md) for how licensing is set up.
 
 ## Setup (OBS / Streamlabs)
 
@@ -164,6 +173,11 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `bg` | — | `transparent` for a see-through background |
 | `demo` | — | `1` = simulated viewers |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |
+| `theme` | `classic` | ★ `neon`, `terminal`, `ocean`, `pastel`, `ember` (ignored with `frame=1`) |
+| `celebrate` | `none` | ★ `confetti`, `fireworks`, `coins` on the Solved screen |
+| `digits` | `standard` | ★ `hand`, `rounded`, `serif`, `pixel` |
+| `ink` | `plain` | ★ `glow`, `stamp` for numbers chat places |
+| `key` | — | Supporter licence key, needed for ★ options (not needed in the demo) |
 
 ## Files
 
@@ -172,9 +186,11 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 - `js/sudoku.js`: puzzle generator, variants and difficulty grader. Every puzzle has exactly one solution.
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering
+- `js/license.js`: licence key checks for the paid extras; settings in `LICENSE_CONFIG`
+- `js/cosmetics.js`, `css/cosmetics.css`: the ★ looks (looks only)
 - `css/style.css`: styling
 
 - `START HERE.txt`: short setup steps for people who downloaded the zip
-- `tools/package.sh`: builds `dist/sudoku-on-stream.zip`; given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/` and the zip to `/sudoku/`
+- `tools/package.sh`: builds `dist/sudoku-on-stream.zip` (the paid download, for the licensing service); given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/`. It never puts the zip on the site.
 
 It uses plain HTML/JS with no build step and no dependencies, so it works straight from disk (`file://`).
