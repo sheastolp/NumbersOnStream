@@ -2,12 +2,14 @@
 
 Sudoku on Stream is free to play. Paying unlocks only:
 
-| Plan | Unlocks | Features on the plan |
-|---|---|---|
-| Offline download | The zip, to run the game from your own computer (no looks) | `offline` |
-| Cosmetics bundle | Every cosmetic (★ looks), on the hosted copy or a download (no zip) | `looks` |
+| Tier | Plan slug | Unlocks | Features on the plan |
+|---|---|---|---|
+| Free | (none) | The hosted game, every gameplay option, the standard look | (no key) |
+| Cosmetics | `cosmetics` | Every ★ look, on the hosted copy or a download (no zip) | `looks` |
+| Supporter bundle | `supporter` | The zip **and** every ★ look | `offline`, `looks` |
+| Offline download | `offline` | The zip (standard look only) | `offline` |
 
-They're separate purchases with separate keys. Someone who wants both buys both; the game only ever needs the Cosmetics bundle key, and the download key is only for getting the zip.
+The game decides by features, not plan names: `looks` turns on the ★ looks, `offline` is for getting the zip.
 
 Cosmetics are looks only: board themes, solve celebrations, digit fonts and digit styles. **No paid option changes puzzles, moves, scoring, hints, timers, difficulty, puzzle types, layouts, the control page or chat commands.** Every gameplay option stays free and needs no key. The code keeps it that way: `js/cosmetics.js` only adds CSS classes and draws the celebration canvas, and `js/game.js` applies looks after the game is already running.
 
@@ -31,11 +33,12 @@ How the game uses it:
 
 1. Install the plugin (build it with `bin/build-plugin-zip.sh` from the `shopify` branch) and set **Licensing → Settings**: brand name (e.g. Tavernworks), key prefix (e.g. `TAVN`), support email, offline grace period (the Terms say 7 days by default), token refresh interval (24 hours), and the payment gateway you'll use.
 2. Add a product with slug **`sudoku-on-stream`**, and two **one-time** plans:
-   - `offline`: features `offline`
    - `cosmetics`: features `looks`
+   - `supporter`: features `offline`, `looks`
+   - `offline`: features `offline`
 
    Set **max activations** generously, or to 0 (unlimited). Every browser and OBS a streamer uses counts as one, and the hosted and downloaded copies count separately. 5 is a reasonable limit if you want one.
-3. Make a page with `[lsvc_buy plan="sudoku-on-stream/offline"]`, one with `[lsvc_buy plan="sudoku-on-stream/cosmetics"]` (or both on one page), and an account page with `[lsvc_account]`.
+3. Make buy pages with `[lsvc_buy plan="sudoku-on-stream/cosmetics"]`, `[lsvc_buy plan="sudoku-on-stream/supporter"]` and `[lsvc_buy plan="sudoku-on-stream/offline"]` (or all on one page), and an account page with `[lsvc_account]`.
 4. CORS: WordPress already answers cross-site REST requests, including `Origin: null` from the offline copy's `file://` pages, so nothing to add. The site must be on HTTPS (the API refuses plain HTTP).
 
 ### In this repo
@@ -48,7 +51,7 @@ Fill in `LICENSE_CONFIG` at the top of `js/license.js`:
 | `product`, `features` | Only change these if you used a different slug or feature names. |
 | `publicKeys` | The keys from `GET <api>/public-keys`, as `{ "<kid>": "<public_key>" }`. If left empty they're fetched at run time. |
 | `issuer` | The licensing site's host name (the tokens' `iss`). |
-| `store.offline`, `store.cosmetics` | The buy pages from step 3 and the prices to show on tavernworks.dev/sudoku. |
+| `store.cosmetics`, `store.supporter`, `store.offline` | The buy pages from step 3 and the prices to show on tavernworks.dev/sudoku. |
 | `accountUrl` | The `[lsvc_account]` page. |
 
 Then run `tools/package.sh ../tavernworks` to publish.
@@ -57,7 +60,7 @@ Then run `tools/package.sh ../tavernworks` to publish.
 
 **The plugin doesn't deliver files yet.** Its purchase email sends the key and a link to the account page, but no download. Until it can, buyers need another way to get the zip. Options:
 
-1. Add download support to the plugin (a file per product, a "Download" button on the account page and a link in the key email, served only to licences whose plan has the `offline` feature). This is the proper fix.
+1. Add download support to the plugin (a file per product, a "Download" button on the account page and a link in the key email, served only to licences whose plan has the `offline` feature, i.e. Supporter and Offline download). This is the proper fix.
 2. Short term: use the plugin's `lsvc_email` filter to add a download link to the key email. The link can be shared, so keep it unlisted and change it now and then.
 
 `tools/package.sh` builds `dist/sudoku-on-stream.zip`. It never puts the zip on the public website.

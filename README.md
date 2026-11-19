@@ -14,12 +14,16 @@ Prefer to run it from your own computer? The **offline download** is a paid extr
 
 ## Paid extras
 
-The game is free to play, with every gameplay option. Paying unlocks only:
+The game is free to play, with every gameplay option. There are four tiers:
 
-- **Offline download**: the zip, to run the game from your own computer. No ★ looks.
-- **Cosmetics bundle**: every ★ look, with no download: board themes (Neon Arcade, Green Terminal, Deep Ocean, Pastel Picnic, Ember Forge), solve celebrations (confetti, fireworks, gold coin shower), digit fonts (handwritten, rounded, storybook serif, pixel) and digit styles (glow, stamp). Works on the hosted copy and on a download.
+| Tier | What you get |
+|---|---|
+| **Free** | The full game, hosted at tavernworks.dev, with every gameplay option and the standard look |
+| **Cosmetics** | Every ★ look (no download): board themes (Neon Arcade, Green Terminal, Deep Ocean, Pastel Picnic, Ember Forge), solve celebrations (confetti, fireworks, gold coin shower), digit fonts (handwritten, rounded, storybook serif, pixel) and digit styles (glow, stamp) |
+| **Supporter bundle** | The offline download **and** every ★ look |
+| **Offline download** | The zip, to run the game from your own computer (standard look only) |
 
-Looks never change how the game plays: no paid option touches puzzles, scoring, hints, timers, difficulty or commands. Try every look free in the demo; on stream, ★ looks need the Cosmetics bundle key in the link (the setup screen adds it). See [LICENSING.md](LICENSING.md) for how licensing is set up.
+Looks never change how the game plays: no paid option touches puzzles, scoring, hints, timers, difficulty or commands. Try every look free in the demo; on stream, ★ looks need a Cosmetics or Supporter key in the link (the setup screen adds it). See [LICENSING.md](LICENSING.md) for how licensing is set up.
 
 ## Setup (OBS / Streamlabs)
 
@@ -177,7 +181,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `celebrate` | `none` | ★ `confetti`, `fireworks`, `coins` on the Solved screen |
 | `digits` | `standard` | ★ `hand`, `rounded`, `serif`, `pixel` |
 | `ink` | `plain` | ★ `glow`, `stamp` for numbers chat places |
-| `key` | — | Cosmetics bundle key, needed for ★ options (not needed in the demo) |
+| `key` | — | Cosmetics or Supporter key, needed for ★ options (not needed in the demo) |
 
 ## Files
 
