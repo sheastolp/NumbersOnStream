@@ -186,7 +186,8 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 - `js/sudoku.js`: puzzle generator, variants and difficulty grader. Every puzzle has exactly one solution.
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering
-- `js/license.js`: licence key checks for the paid extras; settings in `LICENSE_CONFIG`
+- `js/license.js`: browser client for the Tavernworks licensing service (activation, signed tokens, offline grace); settings in `LICENSE_CONFIG`
+- `js/vendor/nacl-fast.min.js`: [TweetNaCl](https://tweetnacl.js.org) 1.0.3 (public domain), used to check licence token signatures
 - `js/cosmetics.js`, `css/cosmetics.css`: the ★ looks (looks only)
 - `css/style.css`: styling
 
