@@ -104,15 +104,20 @@ All types use the same 9×9 grid and the same `B7 4` chat input. The extra regio
 | `!sudoku level auto` / `!sudoku level auto 8` | Adaptive difficulty (optionally starting at 8) |
 | `!sudoku level rotate` | Cycle through every level 1 → 20 |
 | `!sudoku variant windoku` | Set the type for upcoming puzzles (`classic`, `diagonal`, `windoku`, `centerdot`, `asterisk` or `mix`) |
+| `!sudoku stop` / `!sudoku start` | Pause / resume the game (also `pause` / `resume`) |
 | `!sudoku hint` | Reveal one cell |
 | `!sudoku clearnotes` | Clear every viewer note on the board |
 | `!sudoku resetscores` | Wipe all-time scores |
 
-These only work for the broadcaster and moderators. In **Interact** mode you can also press **N** for a new puzzle or **H** for a hint.
+These only work for the broadcaster and moderators. In **Interact** mode you can also press **N** for a new puzzle, **H** for a hint, or **P** to stop / start.
+
+### Start / Stop
+
+**Stop** (control page button, `!sudoku stop`, or **P**) pauses the game: viewers see a "Paused" card, chat moves and notes are ignored, and the puzzle clock, hint countdown and end-screen countdown all freeze. **Start** carries on exactly where it left off; time spent stopped isn't counted. A stopped game stays stopped if the browser source reloads.
 
 ## Control page (`control.html`)
 
-This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 10.
+This is a separate page with **Start / Stop** buttons, a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 10.
 
 Add it in OBS as a second Browser Source sized **1920 × 1080**, and uncheck "Shutdown source when not visible". The page is laid out for 1080p and scrolls if it's taller than the window.
 

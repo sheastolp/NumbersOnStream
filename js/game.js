@@ -26,6 +26,7 @@
   const LS_STATUS = 'numbersonstream.status';
   const LS_HEARTBEAT = 'numbersonstream.heartbeat';
   const LS_SETTINGS = 'numbersonstream.settings';
+  const LS_PAUSED = 'numbersonstream.paused';
 
   function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
   const $ = (s) => document.querySelector(s);
@@ -69,6 +70,30 @@
   const cooldowns = new Map();
   let roundOver = false;
   let nextTimer = null;
+
+  // ---------- Start / stop ----------
+  // Stopped = chat moves and notes are ignored, and every timer (puzzle clock,
+  // hint countdown, end-screen countdown) is frozen. Survives a page reload.
+  let { paused = false, at: pausedAt = 0 } = store.get(LS_PAUSED, {}) || {};
+  function setPaused(on) {
+    if (on === paused) return;
+    if (on) {
+      paused = true; pausedAt = Date.now();
+    } else {
+      const gap = Date.now() - pausedAt;
+      paused = false;
+      // Shift the clocks forward so time spent stopped doesn't count.
+      if (state) {
+        const now = Date.now();
+        state.startedAt = Math.min(state.startedAt + gap, now);
+        state.lastProgress = Math.min(state.lastProgress + gap, now);
+        save();
+      }
+    }
+    store.set(LS_PAUSED, { paused, at: pausedAt });
+    document.body.classList.toggle('paused', paused);
+    feed({ type: 'system', text: paused ? 'Game paused' : 'Game started — go!' });
+  }
 
   // Live settings for upcoming puzzles. Start from the URL; the control page and
   // mod commands can change them. Saved overrides only apply while the URL is unchanged.
@@ -174,6 +199,7 @@
       startedAt: Date.now(),
       lastProgress: Date.now(),
     };
+    if (paused) { pausedAt = Date.now(); store.set(LS_PAUSED, { paused, at: pausedAt }); }
     save();
     renderAll();
     const geo = Sudoku.geometry(state.variant);
@@ -200,6 +226,16 @@
       h *= 60;
     }
     return `hsl(${Math.round(h)} ${Math.round(Math.max(s, 0.55) * 100)}% ${Math.round(Math.min(Math.max(l, 0.62), 0.8) * 100)}%)`;
+  }
+
+  // Player colors are bright for the dark side panel; on the light board use a
+  // darker shade of the same hue so numbers stay high-contrast.
+  function inkFor(color) {
+    const m = /hsl\((\d+) (\d+)% (\d+)%\)/.exec(color || '');
+    if (!m) return color;
+    const h = +m[1];
+    const l = h >= 40 && h <= 190 ? 30 : 38; // yellows/greens need to be darker to read on white
+    return `hsl(${h} ${Math.min(+m[2], 90)}% ${l}%)`;
   }
 
   // ---------- Chat parsing ----------
@@ -242,7 +278,7 @@
   function handleChat(msg) {
     const text = msg.text.trim();
     if (/^!sudoku\b/i.test(text)) return handleCommand(msg, text);
-    if (roundOver || !state) return;
+    if (roundOver || !state || paused) return;
     const notes = parseNotes(text);
     if (notes.length) applyNotes(notes);
     const moves = parseMoves(text);
@@ -300,6 +336,8 @@
       saveSettings();
       feed({ type: 'system', text: a === 'mix' ? 'Variants will mix it up' : `Next puzzles: ${Sudoku.VARIANTS[a].name}` });
     }
+    else if (sub === 'stop' || sub === 'pause') setPaused(true);
+    else if (sub === 'start' || sub === 'resume') setPaused(false);
     else if (sub === 'hint') giveHint();
     else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
     else if (sub === 'clearnotes') { clearAllNotes(); feed({ type: 'system', text: 'All notes cleared' }); }
@@ -425,6 +463,7 @@
     let left = cfg.nextIn;
     $('#ov-next').textContent = left;
     nextTimer = setInterval(() => {
+      if (paused) return;
       left--;
       $('#ov-next').textContent = Math.max(0, left);
       if (left <= 0) newRound();
@@ -466,9 +505,9 @@
     el.classList.toggle('hint', !!(owner && owner.hint));
     el.classList.toggle('claimed', !!(owner && !owner.hint));
     n.textContent = v || '';
-    n.style.color = owner && !owner.hint ? owner.color : '';
+    n.style.color = owner && !owner.hint ? inkFor(owner.color) : '';
     who.textContent = owner ? (owner.hint ? 'hint' : owner.name) : '';
-    who.style.color = owner && !owner.hint ? owner.color : '';
+    who.style.color = owner && !owner.hint ? inkFor(owner.color) : '';
     const mask = v ? 0 : (state.notes && state.notes[i]) || 0;
     el.classList.toggle('has-notes', !!mask);
     [...cells[i].notes.children].forEach((s, k) => s.classList.toggle('on', !!(mask & (1 << (k + 1)))));
@@ -536,7 +575,7 @@
   function fmtTime(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
   function tick() {
-    if (!state) return;
+    if (!state || paused) return;
     if (!roundOver) {
       const secs = Math.floor((Date.now() - state.startedAt) / 1000);
       $('#timer').textContent = fmtTime(secs);
@@ -578,6 +617,7 @@
   setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
 
   // ---------- Boot ----------
+  document.body.classList.toggle('paused', paused);
   buildBoard();
   $('#how-prefix').textContent = cfg.prefix;
   $('#how-prefix2').textContent = cfg.prefix;
@@ -604,6 +644,7 @@
     if (e.target.tagName === 'INPUT') return;
     if (e.key === 'n' || e.key === 'N') newRound({ skip: true });
     if (e.key === 'h' || e.key === 'H') giveHint();
+    if (e.key === 'p' || e.key === 'P') setPaused(!paused);
   });
 
   if (cfg.channel) {
@@ -615,7 +656,7 @@
     const bots = ['PixelPanda', 'grid_wizard', 'NineLives', 'boxbuster', 'Quokka42', 'ZenSolver', 'kettlecorn', 'MossyRock'];
     const colors = ['#FF4500', '#1E90FF', '#9ACD32', '#DAA520', '#8A2BE2', '#00FF7F', '#FF69B4', ''];
     setInterval(() => {
-      if (roundOver) return;
+      if (roundOver || paused) return;
       const k = Math.floor(Math.random() * bots.length);
       const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
       if (!empty.length) return;

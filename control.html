@@ -53,6 +53,13 @@
     label.check { display: flex; gap: 0.5rem; align-items: center; font-size: 0.875rem; color: var(--muted); margin-bottom: 0.625rem; }
     select { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.625rem 0.75rem; margin-bottom: 0.625rem; }
     #var { font-size: 1rem; }
+    .runbar { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .runbar button { font-size: 1.15rem; padding: 0.9rem 0.6rem; }
+    button.go { background: var(--good); }
+    button.stop { background: var(--bad); }
+    .runbar button:disabled { opacity: 0.3; cursor: default; transform: none; }
+    .run-state { text-align: center; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.9rem; }
+    .run-state.on { color: var(--good); } .run-state.off { color: var(--bad); font-weight: 700; }
     button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
     button.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
     button.danger.armed { background: var(--bad); color: #0f1020; }
@@ -78,6 +85,11 @@
   <div class="grid">
     <section class="card">
       <h2>Current puzzle</h2>
+      <div class="runbar">
+        <button id="btn-start" class="go" data-cmd="start">▶ Start</button>
+        <button id="btn-stop" class="stop" data-cmd="stop">■ Stop</button>
+      </div>
+      <div id="run-state" class="run-state">—</div>
       <div class="stats">
         <div><b id="round">—</b><small>Puzzle</small></div>
         <div><b id="diff">—</b><small id="var">Difficulty</small></div>
@@ -210,6 +222,13 @@
       gs.textContent = live ? '● running' : '○ not found — is the game source loaded with the same kind of URL?';
       gs.className = 'dot ' + (live ? 'ok' : 'no');
       syncSettings();
+      const pz = read('numbersonstream.paused');
+      const stopped = !!(pz && pz.paused);
+      $('#btn-start').disabled = !stopped;
+      $('#btn-stop').disabled = stopped;
+      const rs = $('#run-state');
+      rs.textContent = stopped ? '■ Stopped: chat is ignored and timers are frozen' : '▶ Running';
+      rs.className = 'run-state ' + (stopped ? 'off' : 'on');
       const st = read(LS_STATUS);
       $('#chat-state').textContent = st ? st.text : '—';
       const s = read(LS_CUR);
