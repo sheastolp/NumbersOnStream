@@ -14,6 +14,16 @@ Viewers type a cell and a number in chat, for example `B7 4`. Correct answers ap
    - You can also host the folder (for example on GitHub Pages) and use that URL.
 4. To use the hotkeys, right-click the source and choose **Interact**.
 
+### With GuildScribe's full stream theme
+
+GuildScribe's full stream theme has a **Sudoku on Stream** scene (`&scene=sudoku` on the theme link, or pick it on the `!overlays` page). It gives almost the whole parchment sheet to one big torn window for the game, with Tavern Talk chat and the goldboard on the right. There's no emblem, status strip or subtitle in the way.
+
+1. Add the theme (scene **Sudoku on Stream**) as a 1920 × 1080 Browser Source.
+2. Add Sudoku on Stream as a Browser Source **below** the theme, with **Layout: GuildScribe theme** picked on the setup screen (`frame=1` in the URL).
+3. Size it **1464 × 912** and place it at **X 40, Y 112**. The theme's torn edge overlaps it slightly; the layout leaves room for that.
+
+`frame=1` fills the window edge to edge: the board is as tall as the window, and the side panel and background match the parchment (wood desk, cream board, dark-glass panel, Cinzel headings).
+
 To try it with no chat at all, open `index.html?demo=1`. Fake viewers will play.
 
 ## How chat plays
@@ -144,6 +154,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `next` | `45` | Seconds the end screen shows before the next puzzle |
 | `max` | `3` | Max moves accepted per chat message |
 | `notes` | on | `0` turns off viewer notes |
+| `frame` | — | `1` = layout for the Sudoku window of GuildScribe's full stream theme (1464 × 912) |
 | `bg` | — | `transparent` for a see-through background |
 | `demo` | — | `1` = simulated viewers |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |

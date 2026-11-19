@@ -15,6 +15,7 @@
     test: params.get('test') === '1',
     transparent: params.get('bg') === 'transparent',
     notes: params.get('notes') !== '0', // viewers can pencil in notes, e.g. B7?35
+    frame: params.get('frame') === '1', // fills the Sudoku window of GuildScribe's full stream theme
   };
 
   const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
@@ -63,6 +64,14 @@
   }
 
   if (cfg.transparent) document.body.classList.add('transparent');
+  if (cfg.frame) {
+    // Parchment-and-wood look with the theme's fonts (Cinzel headings); the board keeps its plain, high-contrast digits.
+    document.body.classList.add('framed');
+    const font = document.createElement('link');
+    font.rel = 'stylesheet';
+    font.href = 'https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap';
+    document.head.append(font);
+  }
 
   // ---------- State ----------
   let state = null; // { puzzle, solution, grid, owners, scores, level, variant, tech, mixIndex, round, startedAt, lastProgress }

@@ -221,3 +221,59 @@ body.paused #paused-card { display: grid; animation: fade 0.3s; }
 .pc-icon { font-size: 10vh; line-height: 1; color: var(--accent); }
 .pc-title { font-size: 8vh; font-weight: 900; color: var(--accent2); }
 .pc-sub { font-size: 2.6vh; color: var(--muted); }
+
+/* ---------- Framed: fills the torn window of GuildScribe's "Sudoku on Stream" theme scene ----------
+   Wood-desk background, a cream parchment board and dark-glass panel like the theme's goldboard card.
+   The padding keeps everything clear of the theme's torn edge, which overlaps the window by up to ~28 px. */
+body.framed {
+  --f-pad: 3.9vh;
+  --f-head: "Cinzel", Georgia, serif;
+  --text: #f6ead2;
+  --muted: #c8ab82;
+  --accent: #e6a56e;
+  --accent2: #f2c46a;
+  --line: #5e4128;
+  --bg: #120c07;
+  --bg2: #1d140c;
+  --panel: rgba(21, 16, 11, 0.86);
+  --b-empty: #fdf6e3;
+  --b-given-bg: #ecdcb2;
+  --b-given: #2b1a0a;
+  --b-claimed-bg: #fffaf0;
+  --b-line: #ccb489;
+  --b-line-strong: #5a3a16;
+  --b-coord: #a08355;
+  --b-note: #6b4419;
+  --b-hint: #7a6040;
+  --b-mark: #b26a12;
+  background:
+    radial-gradient(ellipse at 28% 18%, rgba(255, 214, 150, 0.10), transparent 60%),
+    repeating-linear-gradient(97deg, transparent 0 34px, rgba(0, 0, 0, 0.10) 34px 35px, transparent 35px 71px),
+    linear-gradient(160deg, #3b2716 0%, #24180d 55%, #170f08 100%);
+}
+body.framed.transparent { background: transparent; }
+.framed #game { padding: var(--f-pad); gap: var(--f-pad); }
+.framed .board-wrap { height: calc(100vh - 2 * var(--f-pad)); }
+.framed .lbl { color: var(--accent2); font-family: var(--f-head); text-shadow: 0 0.2vh 0.4vh #000; }
+.framed .cell.unit { animation-name: unit-framed; }
+@keyframes unit-framed { 0% { background: #f7c96a; } }
+.framed .panel {
+  font-size: 1.8vh; gap: 1.3vh; padding: 2vh 2.2vh;
+  border: 1px solid rgba(230, 165, 110, 0.5);
+  border-radius: 1vh;
+  box-shadow: inset 0 0 0 0.5vh rgba(0, 0, 0, 0.18), inset 0 0 0 0.6vh rgba(230, 165, 110, 0.18), 0 0.8vh 2.4vh rgba(0, 0, 0, 0.45);
+}
+.framed h1 { font-family: var(--f-head); font-weight: 700; letter-spacing: 0.04em; color: var(--accent2); font-size: 3.3vh; }
+.framed h1 span { color: var(--text); }
+.framed h2 { font-family: var(--f-head); font-weight: 700; color: var(--accent); letter-spacing: 0.14em; font-size: 1.6vh; }
+.framed .lb li { background: rgba(255, 236, 200, 0.06); padding: 0.2vh 1vh; }
+.framed .example { font-size: 3.2vh; }
+.framed .example { border: 1px solid rgba(242, 196, 106, 0.35); }
+.framed #difficulty { background: var(--line); }
+.framed #overlay { background: rgba(14, 9, 4, 0.72); }
+.framed .ov-card { background: var(--bg2); border-color: var(--accent2); box-shadow: 0 0 6vh rgba(242, 196, 106, 0.28); }
+.framed .ov-title, .framed .pc-title, .framed #ov-mvp { font-family: var(--f-head); }
+.framed #paused-card { background: rgba(14, 9, 4, 0.8); }
+/* Room for the Live feed: all-time shows its top 3 here (this puzzle keeps 5). */
+.framed #all-list li:nth-child(n + 4) { display: none; }
+.framed .feed-wrap { min-height: 12vh; }
