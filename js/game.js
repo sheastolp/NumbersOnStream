@@ -21,13 +21,17 @@
   const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
   const MAX = Sudoku.MAX_LEVEL;
   const MODES = ['auto', 'fixed', 'rotate'];
-  const LS_ALL = 'numbersonstream.alltime';
-  const LS_CUR = 'numbersonstream.current';
-  const LS_CMD = 'numbersonstream.cmd';
-  const LS_STATUS = 'numbersonstream.status';
-  const LS_HEARTBEAT = 'numbersonstream.heartbeat';
-  const LS_SETTINGS = 'numbersonstream.settings';
-  const LS_PAUSED = 'numbersonstream.paused';
+  // A channel-less demo (e.g. the preview on tavernworks.dev/sudoku) keeps its
+  // own storage, so it never touches a real game's scores or the control page.
+  const SANDBOX = cfg.demo && !cfg.channel;
+  const NS = SANDBOX ? 'numbersonstream.demo.' : 'numbersonstream.';
+  const LS_ALL = NS + 'alltime';
+  const LS_CUR = NS + 'current';
+  const LS_CMD = NS + 'cmd';
+  const LS_STATUS = NS + 'status';
+  const LS_HEARTBEAT = NS + 'heartbeat';
+  const LS_SETTINGS = NS + 'settings';
+  const LS_PAUSED = NS + 'paused';
 
   function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
   const $ = (s) => document.querySelector(s);
@@ -685,7 +689,7 @@
     else runCommand(c.cmd, c.arg || '');
   }
   window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
-  try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
+  if (!SANDBOX) try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
   setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
 
   // ---------- Boot ----------

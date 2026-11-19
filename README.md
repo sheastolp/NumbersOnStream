@@ -6,6 +6,12 @@ Viewers type a cell and a number in chat, for example `B7 4`. Correct answers ap
 
 **No chatbot needed.** The page connects to Twitch chat anonymously and read-only, the same way twitch.tv shows chat to logged-out viewers. There's no bot account, no OAuth token and nothing to host. It never posts to chat.
 
+## Quick start (nothing to download)
+
+Go to **[tavernworks.dev/sudoku](https://tavernworks.dev/sudoku/)**, type your channel name, and paste the link it gives you into an OBS Browser Source (1920 × 1080). The page has the full step-by-step guide.
+
+Prefer to run it from your own computer? Download **[sudoku-on-stream.zip](https://tavernworks.dev/sudoku/sudoku-on-stream.zip)**, unzip it, and open `START HERE.txt`.
+
 ## Setup (OBS / Streamlabs)
 
 1. Open `index.html` in a browser. A setup screen appears.
@@ -167,5 +173,8 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering
 - `css/style.css`: styling
+
+- `START HERE.txt`: short setup steps for people who downloaded the zip
+- `tools/package.sh`: builds `dist/sudoku-on-stream.zip`; given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/` and the zip to `/sudoku/`
 
 It uses plain HTML/JS with no build step and no dependencies, so it works straight from disk (`file://`).

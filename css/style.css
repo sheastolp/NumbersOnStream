@@ -44,6 +44,8 @@ body.setup-mode #setup { display: grid; place-items: center; }
 body.setup-mode #game { display: none; }
 .setup-card { width: min(640px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
 .setup-card p { color: var(--muted); line-height: 1.5; }
+.setup-card p.small { font-size: 13px; margin-top: -4px; }
+.setup-card a { color: var(--accent2); }
 #setup-form { display: grid; gap: 14px; }
 #setup-form label { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
 #setup-form label.check { display: flex; align-items: center; gap: 8px; }

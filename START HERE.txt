@@ -1,0 +1,23 @@
+SUDOKU ON STREAM
+A Sudoku your Twitch chat solves together, shown in OBS as a Browser Source.
+
+EASIEST WAY (nothing to download)
+  Go to https://tavernworks.dev/sudoku/ and follow the steps there.
+  You get a link to paste into OBS. Done.
+
+USING THIS DOWNLOAD INSTEAD (works offline)
+  1. Unzip this folder somewhere it can stay, e.g. Documents\Sudoku on Stream.
+  2. Double-click index.html. A setup screen opens in your browser.
+  3. Type your Twitch channel name, pick your options, click "Copy URL".
+  4. In OBS: Sources > + > Browser. Untick "Local file", paste the URL
+     into the URL box, and set Width 1920, Height 1080.
+  5. Chat plays by typing a cell and a number, like:  B7 4
+
+OPTIONAL: CONTROL PAGE (start/stop, difficulty, hints, scores)
+  Add control.html as a second Browser Source (1920 x 1080) the same way,
+  as a file:/// URL from this same folder, and untick "Shutdown source when
+  not visible". Right-click it > Interact to use the buttons.
+  Keep it in a scene you never switch to, so it never shows on stream.
+
+No bot, no login and no account: the page reads your chat anonymously
+and never posts in it. Full guide: README.md or tavernworks.dev/sudoku
