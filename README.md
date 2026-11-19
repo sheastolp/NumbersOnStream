@@ -41,7 +41,7 @@ Notes are free: they're never checked and never score. When a number is placed, 
 - Completing a row, column or 3×3 box: **+5** each
 - Placing the last cell of the puzzle: **+10**
 - Wrong answer: **−2**, plus a short cooldown for that viewer (default 3 s)
-- If nobody makes progress for 60 s, a free hint cell is revealed.
+- If nobody gets a correct answer for 60 s, a free hint cell is revealed. The bar under the title counts down to it: full after every correct answer, turning gold then red as the hint gets close. (With hints off, `hint=0`, the bar shows puzzle progress instead.)
 - When the puzzle is solved, an MVP screen shows, then a new puzzle starts.
 
 Scores for the current puzzle and all-time scores (including wins) are saved in the browser source. The puzzle in progress is saved too, so refreshing the source doesn't lose it.

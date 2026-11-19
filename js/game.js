@@ -574,19 +574,29 @@
 
   function fmtTime(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
+  let lastFrac = 1;
   function tick() {
     if (!state || paused) return;
     if (!roundOver) {
       const secs = Math.floor((Date.now() - state.startedAt) / 1000);
       $('#timer').textContent = fmtTime(secs);
       const filled = state.grid.filter(Boolean).length;
-      $('#progress-bar').style.width = `${(filled / 81) * 100}%`;
+      const bar = $('#progress-bar');
       $('#remaining').textContent = `${81 - filled} left`;
       if (cfg.hintAfter > 0) {
+        // The bar is a countdown to the next free hint: full after a correct answer, empty when it drops.
         const idle = (Date.now() - state.lastProgress) / 1000;
+        const frac = Math.max(0, Math.min(1, 1 - idle / cfg.hintAfter));
         const left = Math.ceil(cfg.hintAfter - idle);
+        const refill = frac > lastFrac + 0.02; // jumped back up: snap rather than slide
+        bar.classList.toggle('snap', refill);
+        bar.style.width = `${frac * 100}%`;
+        bar.dataset.level = frac > 0.5 ? 'ok' : frac > 0.2 ? 'low' : 'urgent';
+        lastFrac = frac;
         $('#hint-in').textContent = left > 0 ? `hint in ${left}s` : '';
         if (left <= 0) giveHint();
+      } else {
+        bar.style.width = `${(filled / 81) * 100}%`;
       }
     }
   }
