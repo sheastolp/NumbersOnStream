@@ -37,9 +37,21 @@
         </div>
         <label class="check"><input type="checkbox" name="notes" value="1" checked> Let viewers pencil in notes (e.g. B7?35)</label>
         <label class="check"><input type="checkbox" name="bg" value="transparent"> Transparent background</label>
-        <label>Browser Source URL <input id="setup-url" readonly></label>
+        <fieldset class="obs-box">
+          <label class="check"><input type="checkbox" name="obs" value="1"> Run the control page as an OBS dock (uses OBS WebSocket)</label>
+          <div class="obs-fields">
+            <p class="small-note">In OBS: <b>Tools → WebSocket Server Settings</b> → tick <b>Enable WebSocket server</b>. Copy the password from <b>Show Connect Info</b>.</p>
+            <div class="row2">
+              <label>OBS WebSocket password <input name="obspass" type="password" autocomplete="off" placeholder="(blank if authentication is off)"></label>
+              <label>Port <input name="obsport" type="number" min="1" max="65535" value="4455"></label>
+            </div>
+          </div>
+        </fieldset>
+        <label>Browser Source URL (the game) <input id="setup-url" readonly></label>
+        <label>Control page URL (for an OBS Custom Browser Dock) <input id="setup-control-url" readonly></label>
         <div class="actions">
-          <button type="button" id="setup-copy">Copy URL</button>
+          <button type="button" id="setup-copy">Copy game URL</button>
+          <button type="button" id="setup-copy-control">Copy control URL</button>
           <button type="submit">Open</button>
           <button type="button" id="setup-demo" class="ghost">Try demo</button>
         </div>
@@ -107,6 +119,7 @@
 
   <script src="js/sudoku.js"></script>
   <script src="js/twitch.js"></script>
+  <script src="js/obsbridge.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

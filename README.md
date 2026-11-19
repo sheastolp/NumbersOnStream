@@ -91,11 +91,22 @@ These only work for the broadcaster and moderators. In **Interact** mode you can
 
 ## Control page (`control.html`)
 
-This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
+This is a separate page with a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 10.
 
-Add it in OBS as a second Browser Source sized **1920 × 1080** and keep it hidden. The page is laid out for 1080p and scrolls on its own if it's taller than the window, even with OBS's default custom CSS. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
+### Recommended: as an OBS dock (always visible, never on stream)
 
-Load both sources the same way, as `file:///…` URLs in the URL field. The control page talks to the game through shared browser storage, so the two must have the same origin.
+OBS stops drawing hidden Browser Sources, so a hidden control source can't be used through **Interact**. Run it as a dock instead. The dock talks to the game through OBS's built-in WebSocket server (OBS 28 or newer):
+
+1. In OBS, open **Tools → WebSocket Server Settings**, tick **Enable WebSocket server**, and click **Show Connect Info** to copy the password.
+2. On the setup screen, tick **Run the control page as an OBS dock** and paste the password.
+3. Use **Copy game URL** for the game's Browser Source. The game URL must have the OBS link on as well.
+4. Use **Copy control URL**, then in OBS open **Docks → Custom Browser Docks**, give it a name, paste the URL, and click **Apply**. Dock the panel wherever you like. It scrolls if it's taller than the panel.
+
+Because it goes through OBS, the same control URL also works in a normal browser tab, or on a phone or tablet on your network (replace `localhost` with your PC's address by adding `obshost=192.168.x.x`).
+
+### Alternative: as a hidden Browser Source
+
+Add it as a second Browser Source sized **1920 × 1080**, uncheck "Shutdown source when not visible", and load both sources the same way (both `file:///…` or both from the same website), since this mode talks through shared browser storage. It only accepts clicks while the source is visible, so the dock is usually easier.
 
 ## URL options
 
@@ -110,6 +121,10 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 | `next` | `20` | Seconds between puzzles |
 | `max` | `3` | Max moves accepted per chat message |
 | `notes` | on | `0` turns off viewer notes |
+| `obs` | — | `1` = link to the control page through OBS WebSocket (needed for the dock) |
+| `obspass` | — | OBS WebSocket password |
+| `obsport` | `4455` | OBS WebSocket port |
+| `obshost` | `localhost` | OBS machine address (for a control page on another device) |
 | `bg` | — | `transparent` for a see-through background |
 | `demo` | — | `1` = simulated viewers |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |
@@ -120,6 +135,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 - `control.html`: streamer control panel
 - `js/sudoku.js`: puzzle generator, variants and difficulty grader. Every puzzle has exactly one solution.
 - `js/twitch.js`: anonymous read-only Twitch chat client
+- `js/obsbridge.js`: OBS WebSocket link between the game and the control page
 - `js/game.js`: game rules, scoring, chat parsing and rendering
 - `css/style.css`: styling
 
