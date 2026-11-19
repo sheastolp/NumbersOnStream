@@ -18,12 +18,13 @@ YOU MAY NOT
   - Remove or get around the licence check for the * looks.
 
 Paying never changes how the game plays. Refunds within 14 days of buying,
-no questions asked: ask on the Tavernworks Discord, or reply to your receipt.
+no questions asked: email sheastolp@gmail.com, or reply to your receipt.
 A refund or chargeback cancels this licence.
 
 NO WARRANTY. Except where the law doesn't allow it, this software is provided
 "as is", without warranty of any kind. Tavernworks' total liability for any
 claim is limited to what you paid for it. This doesn't affect any consumer
-rights you have that can't be limited by contract. The full terms are at
-https://tavernworks.dev/terms/ and the privacy policy is at
-https://tavernworks.dev/privacy/.
+rights you have that can't be limited by contract. These terms are governed by
+the laws of North Dakota, USA (local consumer laws still protect you if you
+live elsewhere). The full terms are at https://tavernworks.dev/terms/ and the
+privacy policy is at https://tavernworks.dev/privacy/.
