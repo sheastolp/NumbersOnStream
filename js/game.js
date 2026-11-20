@@ -21,6 +21,10 @@
   const LS_CMD = 'numbersonstream.cmd';
   const LS_STATUS = 'numbersonstream.status';
   const LS_HEARTBEAT = 'numbersonstream.heartbeat';
+  const LS_SETTINGS = 'numbersonstream.settings'; // overrides set from the control page
+  const LS_CONFIG = 'numbersonstream.config'; // effective settings, read by the control page
+  const SOLVED_MIN = 3, SOLVED_MAX = 600; // limits for the solved-screen time, in seconds
+  const urlNextIn = cfg.nextIn;
 
   function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
   const $ = (s) => document.querySelector(s);
@@ -57,6 +61,28 @@
   const cooldowns = new Map();
   let roundOver = false;
   let nextTimer = null;
+  let endedAt = 0;
+
+  // ---------- Solved-screen time (set from the control page) ----------
+  function clampSolved(n) { return Math.min(SOLVED_MAX, Math.max(SOLVED_MIN, Math.round(n))); }
+  const savedSettings = store.get(LS_SETTINGS, {});
+  if (Number.isFinite(savedSettings.nextIn)) cfg.nextIn = clampSolved(savedSettings.nextIn);
+  function publishConfig() { store.set(LS_CONFIG, { nextIn: cfg.nextIn, urlNextIn, custom: Number.isFinite(store.get(LS_SETTINGS, {}).nextIn) }); }
+  function setSolvedTime(arg) {
+    const settings = store.get(LS_SETTINGS, {});
+    if (arg === 'default' || arg === 'reset') {
+      delete settings.nextIn;
+      cfg.nextIn = urlNextIn;
+    } else {
+      const n = parseFloat(arg);
+      if (!Number.isFinite(n)) return;
+      cfg.nextIn = settings.nextIn = clampSolved(n);
+    }
+    store.set(LS_SETTINGS, settings);
+    publishConfig();
+    feed({ type: 'system', text: `Solved screen now shows for ${cfg.nextIn}s` });
+    if (roundOver) updateNextCountdown(); // apply to the screen showing right now
+  }
 
   function nextDifficulty() {
     if (ROTATION.includes(cfg.difficulty)) return cfg.difficulty;
@@ -157,6 +183,7 @@
   function runCommand(sub, arg) {
     if (sub === 'new' || sub === 'skip') newRound(ROTATION.includes(arg) ? arg : undefined);
     else if (sub === 'hint') giveHint();
+    else if (sub === 'solvedtime') setSolvedTime(arg);
     else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
     else if (sub === 'resetround') {
       if (state) { state.scores = {}; save(); renderBoards(); feed({ type: 'system', text: 'Scores for this puzzle reset' }); }
@@ -239,13 +266,16 @@
     $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody — hints solved it!';
     $('#ov-mvp').style.color = top[0] ? top[0].color : '';
     $('#overlay').classList.add('show');
-    let left = cfg.nextIn;
-    $('#ov-next').textContent = left;
-    nextTimer = setInterval(() => {
-      left--;
-      $('#ov-next').textContent = Math.max(0, left);
-      if (left <= 0) newRound();
-    }, 1000);
+    endedAt = Date.now();
+    clearInterval(nextTimer);
+    nextTimer = setInterval(updateNextCountdown, 250);
+    updateNextCountdown();
+  }
+
+  function updateNextCountdown() {
+    const left = Math.ceil((endedAt + cfg.nextIn * 1000 - Date.now()) / 1000);
+    $('#ov-next').textContent = Math.max(0, left);
+    if (left <= 0) newRound();
   }
 
   // ---------- Rendering ----------
@@ -382,6 +412,7 @@
   window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
   try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
   setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
+  publishConfig();
 
   // ---------- Boot ----------
   buildBoard();

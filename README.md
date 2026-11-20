@@ -39,12 +39,13 @@ Scores for the current puzzle and all-time scores (including wins) are saved in 
 | `!sudoku new` | New puzzle (optionally `!sudoku new hard`) |
 | `!sudoku hint` | Reveal one cell |
 | `!sudoku resetscores` | Wipe all-time scores |
+| `!sudoku solvedtime 30` | Show the solved screen for 30 s (3–600). `!sudoku solvedtime default` goes back to the URL's `next` value |
 
 These only work for the broadcaster and moderators. In **Interact** mode you can also press **N** for a new puzzle or **H** for a hint.
 
 ## Control page (`control.html`)
 
-This is a separate page with buttons for: new puzzle (choose the difficulty), reveal a hint, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
+This is a separate page with buttons for: new puzzle (choose the difficulty), reveal a hint, how long the "Solved!" screen is shown, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 5.
 
 Add it in OBS as a second Browser Source and keep it hidden. Uncheck "Shutdown source when not visible" so it keeps running, then right-click it and choose **Interact** to use it.
 
@@ -59,7 +60,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 | `prefix` | none | Require a prefix such as `!` (so `!B7 4`). Use this if moves are triggering from normal chat |
 | `hint` | `60` | Seconds without progress before a free hint (`0` = off) |
 | `cooldown` | `3` | Seconds a viewer waits after a wrong guess |
-| `next` | `20` | Seconds between puzzles |
+| `next` | `20` | Seconds the solved screen shows before the next puzzle. A time set from the control page or `!sudoku solvedtime` overrides this until reset to default |
 | `max` | `3` | Max moves accepted per chat message |
 | `bg` | — | `transparent` for a see-through background |
 | `demo` | — | `1` = simulated viewers |
