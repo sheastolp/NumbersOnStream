@@ -2,7 +2,7 @@
 
 A Sudoku that your Twitch chat solves together, made to run as an OBS **Browser Source**.
 
-Viewers type a cell and a number in chat, for example `B7 4`. Correct answers appear on the board in the viewer's chat colour with their name, and points go to a live leaderboard.
+Viewers type a cell and a number in chat, for example `B7 4` (the space is optional, so `B74` works too). Correct answers appear on the board in the viewer's chat colour with their name, and points go to a live leaderboard.
 
 **No chatbot needed.** The page connects to Twitch chat anonymously and read-only, the same way twitch.tv shows chat to logged-out viewers. There's no bot account, no OAuth token and nothing to host. It never posts to chat.
 

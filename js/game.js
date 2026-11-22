@@ -82,7 +82,7 @@
     };
     save();
     renderAll();
-    feed({ type: 'system', text: `New ${state.difficulty} puzzle! Type a cell and a number, e.g. B7 4` });
+    feed({ type: 'system', text: `New ${state.difficulty} puzzle! Type a cell and a number, e.g. B7 4 or B74 (no space needed)` });
   }
 
   function save() { store.set(LS_CUR, state); store.set(LS_ALL, allTime); }
@@ -387,6 +387,7 @@
   buildBoard();
   $('#how-prefix').textContent = cfg.prefix;
   $('#how-prefix2').textContent = cfg.prefix;
+  $('#how-prefix3').textContent = cfg.prefix;
   const saved = store.get(LS_CUR, null);
   if (saved && saved.solution && saved.grid && !saved.grid.every(Boolean)) {
     state = saved;
