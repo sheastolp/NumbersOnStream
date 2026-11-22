@@ -237,7 +237,7 @@
     renderAll();
     const geo = Sudoku.geometry(state.variant);
     const label = `${geo.key === 'classic' ? '' : geo.name + ' '}puzzle (level ${state.level} · ${Sudoku.LEVELS[state.level].name})`;
-    feed({ type: 'system', text: `New ${label}! Type a cell and a number, e.g. B7 4 or B74 (no space needed)` });
+    feed({ type: 'system', text: `New ${label}! Type a cell and a number, e.g. B7 4 or B74` });
     if (geo.rule) feed({ type: 'system', text: `Twist: ${geo.rule}` });
   }
 
