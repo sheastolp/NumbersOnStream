@@ -174,6 +174,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering
 - `css/style.css`: styling
+- `css/fonts/`: the Alegreya fonts the overlay uses (SIL Open Font License, see `css/fonts/OFL.txt`), bundled so it works offline
 
 - `START HERE.txt`: short setup steps for people who downloaded the zip
 - `tools/package.sh`: builds `dist/sudoku-on-stream.zip`; given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/` and the zip to `/sudoku/`

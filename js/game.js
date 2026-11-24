@@ -106,7 +106,7 @@
     }
     store.set(LS_PAUSED, { paused, at: pausedAt });
     document.body.classList.toggle('paused', paused);
-    feed({ type: 'system', text: paused ? 'Game paused' : 'Game started — go!' });
+    feed({ type: 'system', text: paused ? 'Game paused' : 'Game on' });
   }
 
   // Live settings for upcoming puzzles. Start from the URL; the control page and
@@ -237,7 +237,7 @@
     renderAll();
     const geo = Sudoku.geometry(state.variant);
     const label = `${geo.key === 'classic' ? '' : geo.name + ' '}puzzle (level ${state.level} · ${Sudoku.LEVELS[state.level].name})`;
-    feed({ type: 'system', text: `New ${label}! Type a cell and a number, e.g. B7 4 or B74` });
+    feed({ type: 'system', text: `Fresh ${label} on the board. Type a cell and a number, like B7 4 or B74` });
     if (geo.rule) feed({ type: 'system', text: `Twist: ${geo.rule}` });
   }
 
@@ -531,14 +531,14 @@
     renderBoards();
     const secs = Math.round((Date.now() - state.startedAt) / 1000);
     const geo = Sudoku.geometry(state.variant);
-    $('#ov-time').textContent = `${geo.name} · level ${state.level} — solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
+    $('#ov-time').textContent = `${geo.name} · level ${state.level} · solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
     const list = $('#ov-list'); list.replaceChildren();
     top.slice(0, 5).forEach((p, idx) => list.append(row(idx + 1, p.name, p.color, `${p.points} pts · ${p.cells} cells`)));
-    $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody — hints solved it!';
+    $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody. The hints finished it.';
     $('#ov-mvp').style.color = top[0] ? top[0].color : '';
     const nl = nextLevel();
     const arrow = adapt ? (adapt.delta > 0 ? `▲ up ${adapt.delta}` : adapt.delta < 0 ? `▼ down ${-adapt.delta}` : '● same') : '';
-    $('#ov-adapt').textContent = `Next: level ${nl} · ${Sudoku.LEVELS[nl].name}` + (adapt ? ` — ${arrow} (${adapt.why})` : '');
+    $('#ov-adapt').textContent = `Next: level ${nl} · ${Sudoku.LEVELS[nl].name}` + (adapt ? ` · ${arrow} (${adapt.why})` : '');
     $('#ov-adapt').dataset.dir = adapt ? Math.sign(adapt.delta) : 0;
     if (adapt) feed({ type: 'system', text: `Chat got ${adapt.why}: next puzzle level ${nl}` });
     $('#overlay').classList.add('show');
@@ -621,10 +621,10 @@
     const r = $('#round-list'); r.replaceChildren();
     const rr = ranked(state.scores).slice(0, 5);
     rr.forEach((p, i) => r.append(row(i + 1, p.name, p.color, `${p.points}`)));
-    if (!rr.length) r.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: 'No points yet — be first!' }));
+    if (!rr.length) r.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: 'No points yet' }));
     const a = $('#all-list'); a.replaceChildren();
     const aa = ranked(allTime).slice(0, 5);
-    aa.forEach((p, i) => a.append(row(i + 1, p.name, p.color, `${p.points}${p.wins ? ` · ${p.wins}🏆` : ''}`)));
+    aa.forEach((p, i) => a.append(row(i + 1, p.name, p.color, `${p.points}${p.wins ? ` · ${p.wins} ${p.wins === 1 ? 'win' : 'wins'}` : ''}`)));
     if (!aa.length) a.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: '—' }));
   }
 
@@ -735,7 +735,7 @@
     if (!state.stats) state.stats = { correct: 0, wrong: 0, hints: 0, toFill: state.puzzle.filter((v) => !v).length };
     state.lastProgress = Date.now();
     renderAll();
-    feed({ type: 'system', text: 'Puzzle restored — keep going!' });
+    feed({ type: 'system', text: 'Picked up where we left off' });
   } else {
     if (saved) state = { ...saved, level: levelOf(saved) }; // keep round counter/rotation position
     newRound();
