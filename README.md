@@ -73,5 +73,6 @@ Load both sources the same way, as `file:///…` URLs in the URL field. The cont
 - `js/twitch.js`: anonymous read-only Twitch chat client
 - `js/game.js`: game rules, scoring, chat parsing and rendering
 - `css/style.css`: styling
+- `fonts/`: the Alegreya fonts the overlay uses (SIL Open Font License, see `fonts/OFL.txt`). They're bundled so it still works offline from disk.
 
 It uses plain HTML/JS with no build step and no dependencies, so it works straight from disk (`file://`).

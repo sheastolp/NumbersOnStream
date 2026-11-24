@@ -82,7 +82,7 @@
     };
     save();
     renderAll();
-    feed({ type: 'system', text: `New ${state.difficulty} puzzle! Type a cell and a number, e.g. B7 4` });
+    feed({ type: 'system', text: `Fresh ${state.difficulty} puzzle on the board. Type a cell and a number, like B7 4` });
   }
 
   function save() { store.set(LS_CUR, state); store.set(LS_ALL, allTime); }
@@ -236,7 +236,7 @@
     $('#ov-time').textContent = `Solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
     const list = $('#ov-list'); list.replaceChildren();
     top.slice(0, 5).forEach((p, idx) => list.append(row(idx + 1, p.name, p.color, `${p.points} pts · ${p.cells} cells`)));
-    $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody — hints solved it!';
+    $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody. The hints finished it.';
     $('#ov-mvp').style.color = top[0] ? top[0].color : '';
     $('#overlay').classList.add('show');
     let left = cfg.nextIn;
@@ -309,10 +309,10 @@
     const r = $('#round-list'); r.replaceChildren();
     const rr = ranked(state.scores).slice(0, 5);
     rr.forEach((p, i) => r.append(row(i + 1, p.name, p.color, `${p.points}`)));
-    if (!rr.length) r.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: 'No points yet — be first!' }));
+    if (!rr.length) r.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: 'No points yet' }));
     const a = $('#all-list'); a.replaceChildren();
     const aa = ranked(allTime).slice(0, 5);
-    aa.forEach((p, i) => a.append(row(i + 1, p.name, p.color, `${p.points}${p.wins ? ` · ${p.wins}🏆` : ''}`)));
+    aa.forEach((p, i) => a.append(row(i + 1, p.name, p.color, `${p.points}${p.wins ? ` · ${p.wins} ${p.wins === 1 ? 'win' : 'wins'}` : ''}`)));
     if (!aa.length) a.append(Object.assign(document.createElement('li'), { className: 'empty-li', textContent: '—' }));
   }
 
@@ -392,7 +392,7 @@
     state = saved;
     state.lastProgress = Date.now();
     renderAll();
-    feed({ type: 'system', text: 'Puzzle restored — keep going!' });
+    feed({ type: 'system', text: 'Picked up where we left off' });
   } else {
     if (saved) state = saved; // keep round counter/difficulty rotation
     newRound();
