@@ -189,6 +189,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `window` | on | `0` drops the player-style window frame and its menu bar |
 | `theme` | parchment | Starting colours if none has been picked yet: `tavernworks` for the alternative. View → Theme changes it and the game remembers |
 | `demo` | — | `1` = simulated viewers |
+| `pace` | `4` | Demo only: average seconds between the simulated viewers' messages |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |
 | `embed` | — | `1` = the demo on tavernworks.dev/sudoku: on a phone it leaves out the parts the page around it already explains |
 | `solo` | — | `1` = play it yourself in the browser (see [Play it yourself](#play-it-yourself-no-stream)). Ignores `channel`, `demo`, `test` and `frame` |
