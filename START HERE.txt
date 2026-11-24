@@ -19,5 +19,8 @@ OPTIONAL: CONTROL PAGE (start/stop, difficulty, hints, scores)
   not visible". Right-click it > Interact to use the buttons.
   Keep it in a scene you never switch to, so it never shows on stream.
 
+JUST WANT TO PLAY IT YOURSELF?
+  Double-click "Play Sudoku.html". No Twitch, no OBS, no internet needed.
+
 No bot, no login and no account: the page reads your chat anonymously
 and never posts in it. Full guide: README.md or tavernworks.dev/sudoku

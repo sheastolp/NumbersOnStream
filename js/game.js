@@ -16,7 +16,15 @@
     transparent: params.get('bg') === 'transparent',
     notes: params.get('notes') !== '0', // viewers can pencil in notes, e.g. B7?35
     frame: params.get('frame') === '1', // fills the Sudoku window of GuildScribe's full stream theme
+    // One player in a browser: click/tap and type, no Twitch, no OBS. The offline zip's index.html sets SUDOKU_SOLO_ONLY.
+    solo: params.get('solo') === '1' || window.SUDOKU_SOLO_ONLY === true,
   };
+  if (cfg.solo) {
+    // Solo play never touches Twitch, the control page or the theme's web font, so it works fully offline.
+    cfg.channel = ''; cfg.demo = false; cfg.test = false; cfg.frame = false; cfg.prefix = ''; cfg.notes = true;
+    if (!params.has('hint')) cfg.hintAfter = 0; // no free hints unless asked for
+    if (!params.has('cooldown')) cfg.cooldown = 0;
+  }
 
   const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
   const MAX = Sudoku.MAX_LEVEL;
@@ -24,7 +32,8 @@
   // A channel-less demo (e.g. the preview on tavernworks.dev/sudoku) keeps its
   // own storage, so it never touches a real game's scores or the control page.
   const SANDBOX = cfg.demo && !cfg.channel;
-  const NS = SANDBOX ? 'numbersonstream.demo.' : 'numbersonstream.';
+  // Solo play keeps its own storage too, so it never mixes with the stream's scores or puzzle.
+  const NS = cfg.solo ? 'numbersonstream.solo.' : SANDBOX ? 'numbersonstream.demo.' : 'numbersonstream.';
   const LS_ALL = NS + 'alltime';
   const LS_CUR = NS + 'current';
   const LS_CMD = NS + 'cmd';
@@ -32,6 +41,7 @@
   const LS_HEARTBEAT = NS + 'heartbeat';
   const LS_SETTINGS = NS + 'settings';
   const LS_PAUSED = NS + 'paused';
+  const LS_RECORDS = NS + 'records'; // solo: puzzles solved and best times per level
 
   function num(v, d) { const n = parseFloat(v); return Number.isFinite(n) ? n : d; }
   const $ = (s) => document.querySelector(s);
@@ -41,7 +51,7 @@
   };
 
   // ---------- Setup screen (no channel given) ----------
-  if (!cfg.channel && !cfg.demo) {
+  if (!cfg.channel && !cfg.demo && !cfg.solo) {
     document.body.classList.add('setup-mode');
     const form = $('#setup-form');
     const out = $('#setup-url');
@@ -63,6 +73,7 @@
     form.addEventListener('submit', (e) => { e.preventDefault(); update(); location.href = out.value; });
     $('#setup-copy').addEventListener('click', () => { update(); out.select(); navigator.clipboard?.writeText(out.value); });
     $('#setup-demo').addEventListener('click', () => { location.search = '?demo=1'; });
+    $('#setup-solo').addEventListener('click', () => { location.search = '?solo=1'; });
     update();
     return;
   }
@@ -237,7 +248,7 @@
     renderAll();
     const geo = Sudoku.geometry(state.variant);
     const label = `${geo.key === 'classic' ? '' : geo.name + ' '}puzzle (level ${state.level} · ${Sudoku.LEVELS[state.level].name})`;
-    feed({ type: 'system', text: `Fresh ${label} on the board. Type a cell and a number, like B7 4 or B74` });
+    feed({ type: 'system', text: cfg.solo ? `Fresh ${label}. Pick a cell, then a number.` : `Fresh ${label} on the board. Type a cell and a number, like B7 4 or B74` });
     if (geo.rule) feed({ type: 'system', text: `Twist: ${geo.rule}` });
   }
 
@@ -417,7 +428,7 @@
   // Keep the current example while it's empty; otherwise pick a new one,
   // preferring 2-3 candidates so the example is short and easy to read.
   function pickExample() {
-    if (!cfg.notes) { state.example = -1; return; }
+    if (!cfg.notes || cfg.solo) { state.example = -1; return; } // the example teaches chat; a solo player doesn't need it
     if (state.example >= 0 && !state.grid[state.example]) return;
     const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
     if (!empty.length) { state.example = -1; return; }
@@ -503,11 +514,12 @@
     renderBoards();
   }
 
-  function giveHint() {
+  // prefer: a cell to reveal (solo play's selected cell); otherwise a random empty one.
+  function giveHint(prefer) {
     if (roundOver || !state) return;
     const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
     if (!empty.length) return;
-    const i = empty[Math.floor(Math.random() * empty.length)];
+    const i = Number.isInteger(prefer) && prefer >= 0 && !state.grid[prefer] ? prefer : empty[Math.floor(Math.random() * empty.length)];
     state.grid[i] = state.solution[i];
     state.owners[i] = { hint: true };
     state.lastProgress = Date.now();
@@ -540,7 +552,8 @@
     const arrow = adapt ? (adapt.delta > 0 ? `▲ up ${adapt.delta}` : adapt.delta < 0 ? `▼ down ${-adapt.delta}` : '● same') : '';
     $('#ov-adapt').textContent = `Next: level ${nl} · ${Sudoku.LEVELS[nl].name}` + (adapt ? ` · ${arrow} (${adapt.why})` : '');
     $('#ov-adapt').dataset.dir = adapt ? Math.sign(adapt.delta) : 0;
-    if (adapt) feed({ type: 'system', text: `Chat got ${adapt.why}: next puzzle level ${nl}` });
+    if (adapt) feed({ type: 'system', text: `${cfg.solo ? 'You' : 'Chat'} got ${adapt.why}: next puzzle level ${nl}` });
+    if (cfg.solo) { soloSolved(secs); $('#overlay').classList.add('show'); return; } // waits for "Next puzzle", no countdown
     $('#overlay').classList.add('show');
     nextElapsed = 0;
     updateNextCountdown();
@@ -689,6 +702,7 @@
         bar.style.width = `${(filled / 81) * 100}%`;
       }
     }
+    if (cfg.solo) soloRender();
   }
 
   // ---------- Status ----------
@@ -699,7 +713,7 @@
     el.textContent = statusText(s, detail);
   }
   function statusText(s, detail) {
-    return s === 'connected' ? `● reading #${detail}` : s === 'connecting' ? '○ connecting…' : s === 'demo' ? '● demo mode' : `○ disconnected — ${detail || ''}`;
+    return s === 'connected' ? `● reading #${detail}` : s === 'connecting' ? '○ connecting…' : s === 'demo' ? '● demo mode' : s === 'solo' ? '● solo play' : `○ disconnected — ${detail || ''}`;
   }
 
   // ---------- Control page link ----------
@@ -712,9 +726,170 @@
     if (c.cmd === 'chat') handleChat({ user: 'streamer', displayName: c.name || 'Streamer', color: '#FFD700', isBroadcaster: true, isMod: true, text: String(c.arg || '') });
     else runCommand(c.cmd, c.arg || '');
   }
-  window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
-  if (!SANDBOX) try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
-  setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
+  if (!cfg.solo) {
+    window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
+    if (!SANDBOX) try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
+    setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
+  }
+
+  // ---------- Solo play (?solo=1) ----------
+  // One player at the keyboard, mouse or touchscreen. Moves go through the same
+  // rules as chat moves (checked against the solution, notes, hints, adaptive level).
+  const SOLO_PLAYER = { user: 'you', displayName: 'You', color: '#3d7fd0' };
+  let sel = -1; // selected cell
+  let noteMode = false;
+  const padBtns = [];
+
+  function soloInit() {
+    document.body.classList.add('solo');
+    $('#solo').hidden = false;
+    $('#solo-next').hidden = false;
+    setStatus('solo');
+    $('#pc-sub').textContent = 'The board is hidden. Press P or tap here to carry on.';
+    $('#paused-card').addEventListener('click', () => setPaused(false));
+    $('#ov-again').addEventListener('click', () => newRound());
+
+    cells.forEach(({ el }, i) => el.addEventListener('click', () => { sel = i; soloRender(); }));
+    for (let d = 1; d <= 9; d++) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pad-d';
+      const n = document.createElement('span'); n.textContent = d;
+      const left = document.createElement('small');
+      b.append(n, left);
+      b.addEventListener('click', () => soloInput(d));
+      $('#pad').append(b);
+      padBtns.push({ b, left });
+    }
+    $('#pad-notes').addEventListener('click', () => { noteMode = !noteMode; soloRender(); });
+    $('#pad-erase').addEventListener('click', soloErase);
+    $('#pad-hint').addEventListener('click', () => { giveHint(sel); soloRender(); });
+    $('#solo-pause').addEventListener('click', () => setPaused(!paused));
+
+    // A finished-looking puzzle shouldn't vanish on one stray click.
+    const fresh = $('#solo-new');
+    let armed = null;
+    fresh.addEventListener('click', () => {
+      const played = state && state.stats && (state.stats.correct || state.stats.wrong || state.stats.hints);
+      if (played && !armed && !roundOver) {
+        fresh.textContent = 'Drop this one? Click again';
+        armed = setTimeout(() => { armed = null; fresh.textContent = 'New puzzle'; }, 3000);
+        return;
+      }
+      clearTimeout(armed); armed = null; fresh.textContent = 'New puzzle';
+      newRound({ skip: true });
+    });
+
+    const lvl = $('#solo-level');
+    lvl.append(new Option('Adaptive', 'auto'), new Option(`Cycle 1 → ${MAX}`, 'rotate'));
+    for (let l = 1; l <= MAX; l++) lvl.append(new Option(`${l} · ${Sudoku.LEVELS[l].name}`, String(l)));
+    lvl.addEventListener('change', () => {
+      const v = lvl.value;
+      runCommand('level', v === 'auto' ? `auto ${settings.level}` : v === 'rotate' ? 'rotate' : `fixed ${v}`);
+      lvl.blur();
+    });
+    const vr = $('#solo-variant');
+    vr.value = settings.variant;
+    vr.addEventListener('change', () => { runCommand('variant', vr.value); vr.blur(); });
+  }
+
+  function soloInput(d) {
+    if (sel < 0 || roundOver || paused || !state || state.grid[sel]) return;
+    const label = cellLabel(sel);
+    const has = state.notes[sel] & (1 << d);
+    handleChat({ ...SOLO_PLAYER, text: noteMode ? `${label}?${has ? '-' : ''}${d}` : `${label} ${d}` });
+    soloRender();
+  }
+
+  function soloErase() {
+    if (sel < 0 || roundOver || paused || !state || state.grid[sel]) return;
+    handleChat({ ...SOLO_PLAYER, text: `${cellLabel(sel)}?x` });
+    soloRender();
+  }
+
+  function soloKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (roundOver) {
+      if ((k === 'Enter' || k === ' ') && e.target.tagName !== 'BUTTON') { e.preventDefault(); newRound(); } // a focused button handles its own Enter
+      return;
+    }
+    if (k === 'p' || k === 'P' || (paused && (k === 'Enter' || k === ' '))) { e.preventDefault(); setPaused(!paused); return; }
+    if (paused) return;
+    const shifted = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+    if (/^[1-9]$/.test(k)) soloInput(+k);
+    else if (shifted && e.shiftKey) { const was = noteMode; noteMode = true; soloInput(+shifted[1]); noteMode = was; }
+    else if (k === 'Backspace' || k === 'Delete' || k === '0') soloErase();
+    else if (k === 'n' || k === 'N') noteMode = !noteMode;
+    else if (k === 'h' || k === 'H') giveHint(sel);
+    else if (k === 'Escape') sel = -1;
+    else if (k.startsWith('Arrow')) {
+      if (sel < 0) sel = 40;
+      else {
+        let r = Sudoku.row(sel), c = Sudoku.col(sel);
+        if (k === 'ArrowUp') r = (r + 8) % 9; else if (k === 'ArrowDown') r = (r + 1) % 9;
+        else if (k === 'ArrowLeft') c = (c + 8) % 9; else if (k === 'ArrowRight') c = (c + 1) % 9;
+        sel = r * 9 + c;
+      }
+    } else return;
+    e.preventDefault();
+    soloRender();
+  }
+
+  // Highlights, number pad and stats. Cheap, so it simply runs with every tick too.
+  function soloRender() {
+    if (!state) return;
+    const v = sel >= 0 ? state.grid[sel] : 0;
+    const peers = sel >= 0 ? new Set(Sudoku.geometry(state.variant).peers[sel]) : null;
+    cells.forEach(({ el }, i) => {
+      el.classList.toggle('sel', i === sel);
+      el.classList.toggle('peer', !!peers && peers.has(i));
+      el.classList.toggle('same', !!v && i !== sel && state.grid[i] === v);
+    });
+    const placed = new Array(10).fill(0);
+    for (const x of state.grid) placed[x]++;
+    padBtns.forEach(({ b, left }, k) => {
+      const d = k + 1, n = 9 - placed[d];
+      left.textContent = n > 0 ? n : '✓';
+      b.classList.toggle('done', n <= 0);
+      b.classList.toggle('noted', noteMode && sel >= 0 && !state.grid[sel] && !!(state.notes[sel] & (1 << d)));
+    });
+    const nb = $('#pad-notes');
+    nb.classList.toggle('on', noteMode);
+    nb.setAttribute('aria-pressed', noteMode);
+    nb.lastElementChild.textContent = noteMode ? 'on' : 'off';
+    $('#pad').classList.toggle('notes-on', noteMode);
+    $('#solo-pause').textContent = paused ? 'Resume' : 'Pause';
+    const st = state.stats || { wrong: 0, hints: 0 };
+    $('#solo-mistakes').textContent = st.wrong;
+    $('#solo-hints').textContent = st.hints;
+    const rec = store.get(LS_RECORDS, { solved: 0, best: {} });
+    const best = rec.best[state.level];
+    $('#solo-best').textContent = best ? fmtTime(best) : '—';
+    $('#solo-solved').textContent = rec.solved;
+    const lvl = $('#solo-level');
+    if (document.activeElement !== lvl) lvl.value = settings.mode === 'fixed' ? String(settings.level) : settings.mode;
+    lvl.options[0].text = `Adaptive (now ${settings.level})`;
+  }
+
+  // Solved screen for one player: time, mistakes, hints and the best time at this level.
+  // A best time only counts with no hints.
+  function soloSolved(secs) {
+    const rec = store.get(LS_RECORDS, { solved: 0, best: {} });
+    const st = state.stats || { wrong: 0, hints: 0 };
+    rec.solved = (rec.solved || 0) + 1;
+    const prev = rec.best[state.level];
+    const newBest = !st.hints && (!prev || secs < prev);
+    if (newBest) rec.best[state.level] = secs;
+    store.set(LS_RECORDS, rec);
+    const geo = Sudoku.geometry(state.variant);
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    $('#ov-time').textContent = `${geo.name} · level ${state.level} · ${fmtTime(secs)}`;
+    $('#ov-solo').textContent = `${plural(st.wrong, 'mistake')} · ${plural(st.hints, 'hint')}` +
+      (newBest ? ' · New best for this level!' : prev ? ` · Best here: ${fmtTime(prev)}` : '');
+    sel = -1;
+    soloRender();
+    setTimeout(() => $('#ov-again').focus(), 50);
+  }
 
   // ---------- Boot ----------
   document.body.classList.toggle('paused', paused);
@@ -740,11 +915,13 @@
     if (saved) state = { ...saved, level: levelOf(saved) }; // keep round counter/rotation position
     newRound();
   }
+  if (cfg.solo) soloInit();
   setInterval(tick, 250);
   tick();
 
   document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT') return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (cfg.solo) return soloKey(e);
     if (e.key === 'n' || e.key === 'N') newRound({ skip: true });
     if (e.key === 'h' || e.key === 'H') giveHint();
     if (e.key === 'p' || e.key === 'P') setPaused(!paused);
