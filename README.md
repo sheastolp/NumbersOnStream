@@ -56,6 +56,7 @@ To try it with no chat at all, open `index.html?demo=1`. Fake viewers will play.
 |---|---|
 | `B7 4` (or `b7=4`, `B74`, `ok B7 4 i think`) | Puts a 4 in row B, column 7 |
 | `A1 5 C3 2` | Several moves in one message (up to 3) |
+| `!hint` | Reveals one cell. Anyone can ask, then the whole chat waits a minute (`hintcd`) before the next one |
 
 ### Notes (pencil marks)
 
@@ -64,6 +65,7 @@ Chat shares one set of pencil marks. Viewers can jot down which numbers might go
 | Chat message | What happens |
 |---|---|
 | `B7?35` (or `B7? 3 5`, `b7?3,5`) | Pencils small 3 and 5 into B7 |
+| `A1A3?67` | Pencils 6 and 7 into A1 and A3 at once |
 | `B7?-3` | Rubs out the 3 |
 | `B7?x` (or `B7?0`) | Clears all notes in B7 |
 
@@ -156,6 +158,8 @@ These only work for the broadcaster and moderators. In **Interact** mode you can
 
 This is a separate page with **Start / Stop** buttons, a **difficulty slider** and **puzzle type** picker for upcoming puzzles, plus buttons for: start a new puzzle now, reveal a hint, clear all notes, set how long the "Solved!" screen shows, reset this puzzle's scores, reset all-time scores, and making a move as yourself. It also shows the game's status and the current top 10.
 
+**Puzzle → Make a custom puzzle…** lets you fill in a grid of your own (or load a puzzle code) and play it now or next; several can wait in line, and they don't change the adaptive difficulty. The game page has the same menus on its own window frame (Game, Puzzle, Scores, Chat, View, Help) plus play, stop, skip, hint and clear-notes buttons, so for quick changes you can **Interact** with the game source directly. **View → Theme** switches between the parchment board and the Tavernworks colours on both pages.
+
 Add it in OBS as a second Browser Source sized **1920 × 1080**, and uncheck "Shutdown source when not visible". The page is laid out for 1080p and scrolls if it's taller than the window.
 
 OBS only draws a Browser Source while it's visible (eye icon on), and **Interact** shows a blank window for a hidden one. To keep it usable without it appearing on stream, either:
@@ -178,9 +182,12 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `cooldown` | `3` | Seconds a viewer waits after a wrong guess |
 | `next` | `45` | Seconds the end screen shows before the next puzzle. A time set from the control page or `!sudoku solvedtime` overrides this until reset to default |
 | `max` | `3` | Max moves accepted per chat message |
+| `hintcd` | `60` | Seconds between `!hint` requests from chat, shared by everyone (`0` = no wait) |
 | `notes` | on | `0` turns off viewer notes |
 | `frame` | — | `1` = layout for the Sudoku window of GuildScribe's full stream theme (1464 × 912) |
 | `bg` | — | `transparent` for a see-through background |
+| `window` | on | `0` drops the player-style window frame and its menu bar |
+| `theme` | parchment | Starting colours if none has been picked yet: `tavernworks` for the alternative. View → Theme changes it and the game remembers |
 | `demo` | — | `1` = simulated viewers |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |
 | `solo` | — | `1` = play it yourself in the browser (see [Play it yourself](#play-it-yourself-no-stream)). Ignores `channel`, `demo`, `test` and `frame` |
