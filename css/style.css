@@ -312,3 +312,102 @@ body.framed.transparent { background: transparent; }
 /* Room for the Live feed: all-time shows its top 3 here (this puzzle keeps 5). */
 .framed #all-list li:nth-child(n + 4) { display: none; }
 .framed .feed-wrap { min-height: 12vh; }
+
+/* ---------- Solo play (?solo=1): one player with a keyboard, mouse or touchscreen ----------
+   Everything here is scoped to body.solo, so the stream overlay is unchanged.
+   --bs is the board's size; the board's text is sized from it so the board scales on any screen. */
+#ov-solo, #ov-again { display: none; }
+.setup-card p.solo-cta { color: var(--text); border: 1px dashed var(--line); padding: 10px 12px; }
+
+body.solo { --bs: min(98.4vh, calc(100vw - 430px)); }
+.solo #game { align-items: center; }
+.solo .board-wrap {
+  height: var(--bs); width: var(--bs); align-self: center;
+  padding: calc(var(--bs) * 0.003) calc(var(--bs) * 0.01) calc(var(--bs) * 0.01) calc(var(--bs) * 0.003);
+}
+.solo .panel { align-self: stretch; }
+.solo .how, .solo .lb-round, .solo .lb-all { display: none; }
+.solo .lbl { font-size: calc(var(--bs) * 0.0295); }
+.solo .cell { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.solo .cell .num { position: relative; font-size: calc(var(--bs) * 0.063); }
+.solo .cell .coord { font-size: calc(var(--bs) * 0.0117); top: calc(var(--bs) * 0.003); left: calc(var(--bs) * 0.005); }
+.solo .cell .notes { inset: calc(var(--bs) * 0.014) calc(var(--bs) * 0.004) calc(var(--bs) * 0.004); }
+.solo .cell .notes span { font-size: calc(var(--bs) * 0.022); }
+.solo .cell.claimed .who { display: none; }
+.solo .cell.hint .who { font-size: calc(var(--bs) * 0.0132); bottom: calc(var(--bs) * 0.003); color: var(--b-hint); }
+.solo .cell.x-dot::after, .solo .cell.x-star::after { font-size: calc(var(--bs) * 0.016); }
+/* Selection: the cell, its row / column / box (and variant region), and every copy of its number. */
+.solo .cell::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.solo .cell.peer::before { background: rgba(178, 106, 18, 0.10); }
+.solo .cell.same::before { background: rgba(217, 164, 65, 0.42); }
+.solo .cell.sel::before { background: rgba(217, 164, 65, 0.30); box-shadow: inset 0 0 0 calc(var(--bs) * 0.004) var(--b-mark); }
+@media (hover: hover) { .solo .cell.empty:not(.sel):hover::before { background: rgba(178, 106, 18, 0.16); } }
+
+/* Number pad and tools */
+#solo { display: grid; gap: 1.2vh; }
+#solo[hidden], #solo-next[hidden] { display: none; }
+.pad { display: grid; grid-template-columns: repeat(9, 1fr); gap: 0.6vh; }
+.pad-d {
+  display: grid; place-items: center; gap: 0; padding: 0.6vh 0 0.4vh; min-width: 0;
+  background: var(--b-empty); color: var(--b-given); border: 0.25vh solid var(--b-line-strong); border-radius: 3px;
+  font-family: var(--serif); font-size: 4.4vh; font-weight: 700; line-height: 1; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.pad-d small { font-family: var(--font); font-size: 1.4vh; font-weight: 700; color: var(--b-coord); margin-top: 0.2vh; }
+.pad-d.done { opacity: 0.45; }
+@media (hover: hover) { .pad-d:hover { background: #fff3d2; } }
+.pad-d:active { transform: scale(0.96); }
+.pad.notes-on .pad-d { color: var(--b-note); font-size: 3.4vh; font-weight: 400; font-style: italic; }
+.pad.notes-on .pad-d.noted { background: #f2cf86; }
+.pad-tools { display: flex; gap: 0.8vh; flex-wrap: wrap; }
+.pad-tools button { flex: 1 1 0; font-size: 1.9vh; padding: 1vh 1.2vh; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button.tool { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button.tool.on { background: var(--accent); color: var(--oak-dark); border-color: var(--accent); }
+button.tool small { font-weight: 400; opacity: 0.85; }
+.solo-keys { margin: 0; color: var(--muted); line-height: 1.35; }
+.solo-keys b { color: var(--text); }
+.solo-stats { display: flex; flex-wrap: wrap; gap: 0.4vh 2vh; color: var(--muted); font-size: 1.75vh; }
+.solo-stats b { color: var(--text); font-family: var(--serif); margin-left: 0.4vh; }
+#solo-next { display: grid; gap: 1vh; }
+.solo-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 1vh; }
+.solo-pick label { display: grid; gap: 0.4vh; color: var(--muted); font-size: 1.65vh; }
+.solo-pick select { font: inherit; font-size: 1.85vh; color: var(--text); background: var(--room); border: 1px solid var(--line); border-radius: 3px; padding: 0.7vh 0.8vh; min-width: 0; }
+.solo .feed-wrap { min-height: 6vh; }
+#status[data-state=solo] { color: var(--good); }
+
+/* Solved screen: no MVP or countdown, a button instead. */
+.solo .ov-mvp-lbl, .solo #ov-mvp, .solo #ov-list, .solo .ov-next { display: none; }
+.solo #ov-time { font-size: 2.6vh; color: var(--text); margin: 2vh 0 0.6vh; }
+.solo #ov-solo { display: block; font-size: 2.2vh; color: var(--muted); }
+.solo #ov-again { display: inline-block; margin-top: 2.6vh; font-size: 2.4vh; padding: 1.2vh 3vh; }
+.solo #paused-card { cursor: pointer; }
+
+/* Phones, tablets held upright and narrow windows: board on top, pad right under it. */
+@media (max-aspect-ratio: 1/1), (max-width: 760px) {
+  body.solo { --bs: min(calc(100vw - 16px), calc(100vh - 250px)); overflow: auto; }
+  body.solo #game { flex-direction: column; height: auto; min-height: 100vh; padding: 8px; gap: 10px; }
+  body.solo .panel { width: min(100%, 640px); align-self: center; overflow: visible; font-size: 15px; gap: 12px; padding: 14px; }
+  body.solo #solo { order: -1; gap: 10px; }
+  body.solo .pad { gap: 4px; }
+  body.solo .pad-d { font-size: 26px; padding: 6px 0 4px; border-width: 2px; }
+  body.solo .pad-d small { font-size: 11px; }
+  body.solo .pad.notes-on .pad-d { font-size: 21px; }
+  body.solo .pad-tools { gap: 6px; }
+  body.solo .pad-tools button { font-size: 15px; padding: 10px 8px; }
+  body.solo h1 { font-size: 26px; }
+  body.solo h2 { font-size: 15px; margin-bottom: 4px; }
+  body.solo .meta { font-size: 15px; gap: 10px; }
+  body.solo .meta.small { font-size: 13px; }
+  body.solo #timer { font-size: 20px; }
+  body.solo .progress { height: 6px; }
+  body.solo .solo-keys, body.solo .solo-stats, body.solo footer { font-size: 13px; }
+  body.solo .solo-pick label { font-size: 13px; }
+  body.solo .solo-pick select { font-size: 15px; padding: 8px; }
+  body.solo #feed { font-size: 14px; }
+  body.solo .feed-wrap { max-height: 160px; }
+  body.solo .ov-card { min-width: 0; width: calc(100vw - 32px); max-width: 480px; padding: 24px; }
+  body.solo .ov-title, body.solo .pc-title { font-size: 48px; }
+  body.solo #ov-time { font-size: 18px; }
+  body.solo #ov-solo, body.solo #ov-adapt, body.solo .pc-sub { font-size: 15px; }
+  body.solo #ov-again { font-size: 18px; padding: 12px 24px; }
+}
+@media (hover: none) { .solo-keys { display: none !important; } }

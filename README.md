@@ -12,6 +12,24 @@ Go to **[tavernworks.dev/sudoku](https://tavernworks.dev/sudoku/)**, type your c
 
 Prefer to run it from your own computer? Download **[sudoku-on-stream.zip](https://tavernworks.dev/sudoku/sudoku-on-stream.zip)**, unzip it, and open `START HERE.txt`.
 
+## Play it yourself (no stream)
+
+Sudoku on Stream also works as a normal Sudoku for one person, right in a browser. No Twitch, no OBS, and no internet needed.
+
+- **From this folder:** double-click `Play Sudoku.html` (it opens `index.html?solo=1`), or click **Play solo** on the setup screen.
+- **Offline copy:** `tools/package.sh` also builds `dist/sudoku-offline.zip`. It holds only what solo play needs (no Twitch client or control page) and its `index.html` opens straight into solo play. Unzip it anywhere and double-click `Play Sudoku.html`. It makes no network requests at all; the fonts are bundled.
+
+How it plays:
+
+- Click or tap a cell, then a number on the keyboard or the on-screen pad. Wrong numbers bounce off and count as a mistake.
+- **Notes** button (or **N**) switches the pad to pencil marks; **Shift + number** pencils one in directly. **Backspace** clears a cell's notes.
+- **Arrow keys** move, **H** reveals the selected cell (or a random one), **P** pauses and hides the board, **Enter** starts the next puzzle once you've solved one.
+- The selected cell's row, column and box are shaded, and every copy of its number is highlighted. The pad shows how many of each number are still to place.
+- Level (1–20, Adaptive or Cycle) and puzzle type for the next puzzle are under **Next puzzle**. Adaptive follows how you did, with the same rules as for chat.
+- No automatic hints and no wrong-guess cooldown (add `&hint=60` or `&cooldown=3` to the URL if you want them).
+- Best time per level (only puzzles solved with no hints) and puzzles solved are kept in the browser. Solo play has its own storage, so it never touches your stream's scores or puzzle.
+- Works on phones and tablets too: when the screen is taller than wide, the number pad sits right under the board.
+
 ## Setup (OBS / Streamlabs)
 
 1. Open `index.html` in a browser. A setup screen appears.
@@ -165,10 +183,12 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 | `bg` | — | `transparent` for a see-through background |
 | `demo` | — | `1` = simulated viewers |
 | `test` | — | `1` = shows a text box so you can type "chat" messages yourself |
+| `solo` | — | `1` = play it yourself in the browser (see [Play it yourself](#play-it-yourself-no-stream)). Ignores `channel`, `demo`, `test` and `frame` |
 
 ## Files
 
 - `index.html`: the page (setup screen and game)
+- `Play Sudoku.html`: opens the game in solo play
 - `control.html`: streamer control panel
 - `js/sudoku.js`: puzzle generator, variants and difficulty grader. Every puzzle has exactly one solution.
 - `js/twitch.js`: anonymous read-only Twitch chat client
@@ -177,6 +197,7 @@ Load both sources the same way, as `file:///…` URLs in the URL field (or both 
 - `css/fonts/`: the Alegreya fonts the overlay uses (SIL Open Font License, see `css/fonts/OFL.txt`), bundled so it works offline
 
 - `START HERE.txt`: short setup steps for people who downloaded the zip
-- `tools/package.sh`: builds `dist/sudoku-on-stream.zip`; given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/` and the zip to `/sudoku/`
+- `tools/package.sh`: builds `dist/sudoku-on-stream.zip` and `dist/sudoku-offline.zip`; given a path to the tavernworks site (`tools/package.sh ../tavernworks`) it also publishes the hosted copy to `/sudoku/play/` and both zips to `/sudoku/`
+- `tools/offline-readme.txt`: the `READ ME.txt` that goes in the offline zip
 
 It uses plain HTML/JS with no build step and no dependencies, so it works straight from disk (`file://`).
