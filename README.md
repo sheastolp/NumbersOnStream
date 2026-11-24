@@ -48,7 +48,7 @@ GuildScribe's full stream theme has a **Sudoku on Stream** scene (`&scene=sudoku
 
 `frame=1` fills the window edge to edge: the board is as tall as the window, and the side panel and background match the parchment (wood desk, cream board, dark-glass panel, Cinzel headings).
 
-To try it with no chat at all, open `index.html?demo=1`. Fake viewers will play.
+To try it with no chat at all, open `index.html?demo=1`. Fake viewers will play, and a **Your move** box under the scores lets you join in as "You" (click an empty square to pick it). The box says why a move didn't count, for example a square that's already filled or the short wait after a wrong guess.
 
 ## How chat plays
 
