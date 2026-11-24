@@ -3,12 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sudoku Control</title>
+  <title>Sudoku Control - Tavernworks</title>
+  <link rel="icon" id="favicon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>try { if (localStorage.getItem('numbersonstream.theme') !== 'tavernworks') document.documentElement.dataset.theme = 'indigo'; } catch { document.documentElement.dataset.theme = 'indigo'; }</script>
   <style>
+    /* Tavernworks colours by default; View > Theme switches to the original indigo look. */
     :root {
+      --bg: #15100c; --panel: #241a13; --line: #3a2a1d; --text: #f1e6d6; --muted: #b9a68f;
+      --accent: #e0a84a; --accent2: #f5c873; --good: #7fb069; --bad: #d9663a; --on-accent: #15100c;
+      --chrome: #1e1611; --chrome2: #2e2219; --chrome-line: #3a2a1d; --chrome-edge: #0f0b08; --chrome-text: #e6d6bf;
+      --well: #0f0b08; --cell-focus: #33251a; --cell-x: #2c2018; --cell-x-focus: #3d2c1f; --grid-line: #4a3727; --box-line: #b9a68f;
+      --glow: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(224,168,74,.14), transparent 70%), radial-gradient(ellipse 60% 40% at 50% 110%, rgba(201,87,43,.10), transparent 70%);
+      --font: Inter, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      --display: Cinzel, Georgia, serif;
+    }
+    :root[data-theme=indigo] {
       --bg: #0f1020; --panel: #171a33; --line: #2e3463; --text: #eef0ff; --muted: #9aa0c8;
-      --accent: #8b93ff; --accent2: #ffcf5c; --good: #4ade80; --bad: #ff5c7a;
+      --accent: #8b93ff; --accent2: #ffcf5c; --good: #4ade80; --bad: #ff5c7a; --on-accent: #0f1020;
+      --chrome: #1b1e3a; --chrome2: #23274a; --chrome-line: #363c70; --chrome-edge: #12142a; --chrome-text: #cfd3f5;
+      --well: #0b0c1a; --cell-focus: #1d2148; --cell-x: #22264a; --cell-x-focus: #2a2f5c; --grid-line: #2e3463; --box-line: #9aa0c8;
+      --glow: none;
       --font: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      --display: var(--font);
     }
     * { box-sizing: border-box; }
     /* Sized for a 1920x1080 OBS source. OBS's default custom CSS sets body { overflow: hidden },
@@ -18,12 +37,57 @@
     @media (min-width: 1600px) { html { font-size: 20px; } }
     html, body { height: 100%; margin: 0; overflow: hidden !important; background: var(--bg); }
     body { color: var(--text); font: 1rem/1.4 var(--font); }
-    .page { height: 100vh; overflow-y: auto; overscroll-behavior: contain; padding: 1.2rem 1.5rem 2rem; }
+    /* ---- Window frame (title bar, menus, control bar), laid out like a desktop media player ---- */
+    .win { height: 100vh; display: flex; flex-direction: column; border: 1px solid var(--chrome-line); background: var(--bg); }
+    .titlebar { flex: none; display: flex; align-items: center; height: 2.1rem; background: var(--chrome); user-select: none; border-bottom: 1px solid var(--chrome-edge); }
+    .tw-logo { width: 1.35rem; height: 1.35rem; flex: none; margin: 0 0.5rem 0 0.6rem; }
+    .titlebar .ttl { flex: 1; min-width: 0; font-size: 0.8125rem; color: var(--chrome-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .winbtns { display: flex; align-self: stretch; }
+    .winbtns button { width: 2.9rem; height: 100%; padding: 0; border-radius: 0; background: transparent; color: var(--chrome-text); font-weight: 400; font-size: 0.9rem; line-height: 1; }
+    .winbtns button:hover { background: rgba(255,255,255,.08); }
+    .winbtns button.x:hover { background: #c42b1c; color: #fff; }
+    .winbtns button:active { transform: none; }
+    .menubar { flex: none; display: flex; gap: 0.1rem; padding: 0 0.3rem; background: var(--chrome); border-bottom: 1px solid var(--chrome-line); font-size: 0.8125rem; position: relative; z-index: 20; }
+    .menu { position: relative; }
+    .menu > button { background: transparent; color: var(--text); font-weight: 400; padding: 0.3rem 0.6rem; border-radius: 0.25rem; }
+    .menu > button:active { transform: none; }
+    .menu > button u { text-decoration: underline; text-underline-offset: 2px; }
+    .menu.open > button, .menu > button:hover { background: var(--chrome2); }
+    .menu .drop { display: none; position: absolute; top: 100%; left: 0; min-width: 15rem; padding: 0.3rem 0; background: var(--chrome2); border: 1px solid var(--chrome-line); border-radius: 0.375rem; box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,.5); }
+    .menu.open .drop { display: block; }
+    .drop button { display: flex; width: 100%; white-space: nowrap; justify-content: space-between; gap: 1.5rem; background: transparent; color: var(--text); font-weight: 400; text-align: left; border-radius: 0; padding: 0.4rem 0.9rem 0.4rem 2rem; position: relative; }
+    .drop button:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+    .drop button:active { transform: none; }
+    .drop button .ic { position: absolute; left: 0.6rem; width: 1rem; text-align: center; }
+    .drop button kbd { font: inherit; color: var(--muted); }
+    .drop button:hover kbd { color: inherit; }
+    .drop hr { border: 0; border-top: 1px solid var(--chrome-line); margin: 0.3rem 0; }
+    .win { background: var(--glow), var(--bg); }
+    .page { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1.2rem 1.5rem 2rem; }
+    .win.rolled .page, .win.rolled .ctrlbar { display: none; }
+    .win.rolled { height: auto; }
+    .ctrlbar { flex: none; background: var(--chrome); border-top: 1px solid var(--chrome-line); padding: 0.35rem 0.75rem 0.45rem; user-select: none; }
+    .seek { display: flex; align-items: center; gap: 0.75rem; font-size: 0.8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .seek .track { flex: 1; height: 0.4rem; background: var(--well); border-radius: 99px; position: relative; }
+    .seek .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 99px; background: linear-gradient(90deg, #e08700, #ffc24a); transition: width .3s; }
+    .seek .knob { position: absolute; top: 50%; width: 0.85rem; height: 0.85rem; margin: -0.425rem 0 0 -0.425rem; border-radius: 50%; background: #fff8e7; box-shadow: 0 0 0 2px #e08700; left: 0; transition: left .3s; }
+    .transport { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.35rem; }
+    .transport button { background: transparent; color: var(--text); padding: 0.35rem 0.55rem; font-size: 1rem; line-height: 1; border-radius: 0.3rem; min-width: 2.2rem; }
+    .transport button:hover:not(:disabled) { background: var(--chrome2); }
+    .transport button.big { font-size: 1.3rem; background: var(--chrome2); border-radius: 50%; width: 2.5rem; height: 2.5rem; min-width: 0; }
+    .transport button.big:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+    .transport svg { width: 1.1rem; height: 1.1rem; display: block; margin: auto; fill: currentColor; }
+    .transport button.big svg { width: 1.25rem; height: 1.25rem; }
+    .transport .sep { width: 1px; align-self: stretch; background: var(--chrome-line); margin: 0.2rem 0.3rem; }
+    .transport .now { flex: 1; min-width: 0; text-align: right; font-size: 0.8125rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .transport .now b { color: var(--text); font-weight: 600; }
+    .card.flash { animation: flash 1.2s ease-out; }
+    @keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
     .page::-webkit-scrollbar { width: 0.75rem; }
     .page::-webkit-scrollbar-track { background: var(--bg); }
     .page::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; border: 3px solid var(--bg); }
     .page::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-    h1 { margin: 0 0 0.25rem; font-size: 1.375rem; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.375rem; font-family: var(--display); letter-spacing: .02em; }
     h1 span { color: var(--accent); }
     h2 { margin: 0 0 0.625rem; font-size: 0.75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16.25rem, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
@@ -41,7 +105,7 @@
     ol li { display: flex; justify-content: space-between; gap: 0.5rem; background: rgba(255,255,255,.04); border-radius: 0.375rem; padding: 0.25rem 0.5rem; }
     ol li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
     .btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
-    button { font: inherit; font-weight: 700; border: 0; border-radius: 0.5rem; padding: 0.75rem 0.625rem; background: var(--accent); color: #0f1020; cursor: pointer; }
+    button { font: inherit; font-weight: 700; border: 0; border-radius: 0.5rem; padding: 0.75rem 0.625rem; background: var(--accent); color: var(--on-accent); cursor: pointer; }
     button:active { transform: scale(.97); }
     button.wide { grid-column: 1 / -1; }
     .lvl { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.375rem; }
@@ -62,11 +126,46 @@
     .run-state.on { color: var(--good); } .run-state.off { color: var(--bad); font-weight: 700; }
     button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
     button.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
-    button.danger.armed { background: var(--bad); color: #0f1020; }
+    button.danger.armed { background: var(--bad); color: var(--on-accent); }
     form { display: flex; gap: 0.5rem; }
     input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.625rem 0.75rem; }
     .hint { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
     #log { margin-top: 0.5rem; font-size: 0.8125rem; color: var(--accent2); min-height: 1.4em; }
+    /* Custom puzzle builder */
+    .card.full { grid-column: 1 / -1; }
+    .cp { display: grid; grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+    @media (max-width: 760px) { .cp { grid-template-columns: 1fr; } }
+    .cp-board { display: grid; grid-template-columns: repeat(9, 1fr); aspect-ratio: 1; border: 3px solid var(--muted); border-radius: 0.375rem; overflow: hidden; background: var(--grid-line); gap: 1px; }
+    .cp-board input { flex: none; width: 100%; height: 100%; min-width: 0; border: 0; border-radius: 0; padding: 0; text-align: center; font-size: 1.5rem; font-weight: 700; color: var(--accent2); background: var(--bg); caret-color: transparent; cursor: pointer; }
+    .cp-board input:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--cell-focus); }
+    .cp-board input.bx-r { box-shadow: inset -2px 0 0 var(--box-line); } .cp-board input.bx-b { box-shadow: inset 0 -2px 0 var(--box-line); }
+    .cp-board input.bx-r.bx-b { box-shadow: inset -2px -2px 0 var(--box-line); }
+    .cp-board input.x { background: var(--cell-x); } .cp-board input.x:focus { background: var(--cell-x-focus); }
+    .cp-board input.bad { color: var(--on-accent); background: var(--bad); }
+    .cp-side { display: grid; gap: 0.625rem; }
+    .cp-row { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+    /* Button rows instead of dropdowns: OBS's Interact window can't open a <select>'s pop-up list. */
+    .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 0.625rem; }
+    .fld .chips { margin: 0; }
+    .chips button { flex: 1 1 auto; background: transparent; color: var(--text); border: 1px solid var(--line); padding: 0.5rem 0.7rem; font-weight: 600; }
+    .chips button:hover { border-color: var(--accent); }
+    .chips button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+    .fld { display: grid; gap: 0.25rem; font-size: 0.8125rem; color: var(--muted); }
+    .fld select { margin: 0; }
+    textarea { width: 100%; resize: vertical; font: 0.875rem/1.35 ui-monospace, Consolas, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.5rem 0.75rem; word-break: break-all; }
+    .cp-result { font-size: 0.9375rem; padding: 0.625rem 0.75rem; border-radius: 0.5rem; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+    .cp-result.ok { border-color: var(--good); color: var(--text); } .cp-result.ok b { color: var(--good); }
+    .cp-result.err { border-color: var(--bad); color: var(--bad); }
+    .btns3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    button:disabled { opacity: 0.35; cursor: default; transform: none; }
+    h3 { margin: 0.5rem 0 0; font-size: 0.75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+    h3 button { font-size: 0.6875rem; padding: 0.25rem 0.5rem; letter-spacing: 0; text-transform: none; }
+    .cp-list { margin: 0; }
+    .cp-list li { align-items: center; }
+    .cp-list .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+    .cp-list .meta { color: var(--muted); font-size: 0.8125rem; white-space: nowrap; }
+    .cp-list button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+    .cp-list .empty { color: var(--muted); font-style: italic; }
     @media (min-width: 1100px) {
       .grid { grid-template-columns: 1fr 1.15fr 1fr; grid-template-areas: "cur next scores" "cur next chat"; grid-template-rows: auto 1fr; align-items: start; }
       .grid > :nth-child(1) { grid-area: cur; } .grid > :nth-child(2) { grid-area: next; }
@@ -75,6 +174,51 @@
   </style>
 </head>
 <body>
+<div class="win" id="win">
+<div class="titlebar">
+  <svg class="tw-logo" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="tw-ale" x1="0" x2="1"><stop offset="0" stop-color="#ffc24a"/><stop offset="1" stop-color="#e08700"/></linearGradient></defs><path d="M22.5 13h3a3 3 0 0 1 3 3v5.5a3 3 0 0 1-3 3h-3" fill="none" stroke="#b9772a" stroke-width="3"/><rect x="5" y="9.5" width="18" height="20" rx="2.5" fill="url(#tw-ale)"/><rect x="5" y="9.5" width="18" height="20" rx="2.5" fill="none" stroke="#8a5216" stroke-opacity=".55"/><path d="M9.5 14v11.5M14 14v11.5M18.5 14v11.5" stroke="#ffe6a3" stroke-opacity=".55" stroke-width="1.6" stroke-linecap="round"/><path d="M4.2 12.4c-1.9-.6-2-3.7.4-4.4.2-2.5 3.2-3.6 5-2 1.6-2.4 5.4-2.4 7 0 1.8-1.3 4.6-.5 5.1 1.7 2.4.3 2.8 3.6.5 4.5-.7 1.3-2.5 1.4-3.4.4-1.1 1.2-3.1 1.2-4.1 0-1.1 1-3 1-4 0-1 1-2.9.9-3.7-.3-.9.6-2.1.6-2.8.1z" fill="#fff8e7" stroke="#e9dcc0" stroke-width=".6"/></svg>
+  <span class="ttl" id="win-title">Sudoku Control - Tavernworks</span>
+  <div class="winbtns">
+    <button type="button" id="win-min" title="Roll up / down">&#x2014;</button>
+    <button type="button" id="win-max" title="Scroll to the top">&#x2610;</button>
+    <button type="button" class="x" id="win-close" title="To close, remove or hide this Browser Source in OBS">&#x2715;</button>
+  </div>
+</div>
+<nav class="menubar" id="menubar">
+  <div class="menu"><button type="button"><u>G</u>ame</button><div class="drop">
+    <button type="button" data-act="start"><span class="ic">▶</span>Start<kbd></kbd></button>
+    <button type="button" data-act="stop"><span class="ic">■</span>Stop<kbd></kbd></button>
+    <hr>
+    <button type="button" data-act="new"><span class="ic">⏭</span>New puzzle now<kbd></kbd></button>
+    <button type="button" data-act="hint"><span class="ic">💡</span>Reveal a hint<kbd></kbd></button>
+    <button type="button" data-act="clearnotes"><span class="ic">✎</span>Clear all notes<kbd></kbd></button>
+    <button type="button" data-act="autohints" id="menu-autohints"><span class="ic">⏲</span>Automatic hints: On<kbd></kbd></button>
+  </div></div>
+  <div class="menu"><button type="button"><u>P</u>uzzle</button><div class="drop">
+    <button type="button" data-go="custom"><span class="ic">★</span>Make a custom puzzle…<kbd></kbd></button>
+    <button type="button" data-go="custom" data-focus="#cp-code"><span class="ic">📋</span>Load a puzzle code…<kbd></kbd></button>
+    <hr>
+    <button type="button" data-go="next-card"><span class="ic">⚙</span>Difficulty &amp; type…<kbd></kbd></button>
+    <button type="button" data-go="solved-card"><span class="ic">⏱</span>Solved screen time…<kbd></kbd></button>
+  </div></div>
+  <div class="menu"><button type="button"><u>S</u>cores</button><div class="drop">
+    <button type="button" data-go="cur-card"><span class="ic">🏆</span>This puzzle's top 10<kbd></kbd></button>
+    <button type="button" data-go="scores-card"><span class="ic">⚠</span>Reset scores…<kbd></kbd></button>
+  </div></div>
+  <div class="menu"><button type="button"><u>C</u>hat</button><div class="drop">
+    <button type="button" data-go="play-card" data-focus="#chat-text"><span class="ic">💬</span>Play as streamer…<kbd></kbd></button>
+  </div></div>
+  <div class="menu"><button type="button"><u>V</u>iew</button><div class="drop">
+    <button type="button" data-theme-set="indigo"><span class="ic"></span>Theme: Indigo<kbd>default</kbd></button>
+    <button type="button" data-theme-set="tavernworks"><span class="ic"></span>Theme: Tavernworks<kbd></kbd></button>
+    <hr>
+    <button type="button" id="menu-roll"><span class="ic">—</span>Roll up window<kbd></kbd></button>
+  </div></div>
+  <div class="menu"><button type="button"><u>H</u>elp</button><div class="drop">
+    <button type="button" data-href="https://tavernworks.dev/sudoku/"><span class="ic">?</span>Setup guide<kbd>tavernworks.dev/sudoku</kbd></button>
+    <button type="button" data-href="https://tavernworks.dev/"><span class="ic">🍺</span>About Tavernworks<kbd></kbd></button>
+  </div></div>
+</nav>
 <div class="page">
   <h1>Sudoku <span>Control</span></h1>
   <div class="status">
@@ -83,7 +227,7 @@
   </div>
 
   <div class="grid">
-    <section class="card">
+    <section class="card" id="cur-card">
       <h2>Current puzzle</h2>
       <div class="runbar">
         <button id="btn-start" class="go" data-cmd="start">▶ Start</button>
@@ -99,7 +243,7 @@
       <ol id="top"></ol>
     </section>
 
-    <section class="card">
+    <section class="card" id="next-card">
       <h2>Next puzzles</h2>
       <select id="mode">
         <option value="auto">Adaptive: follows how chat answers</option>
@@ -125,7 +269,7 @@
       <p class="hint">The slider and type apply to every puzzle after this one. "Start new puzzle now" skips the current one.</p>
     </section>
 
-    <section class="card">
+    <section class="card" id="solved-card">
       <h2>Solved screen</h2>
       <form id="solved-form">
         <input id="solved-secs" type="number" min="3" max="600" step="1" placeholder="seconds" aria-label="Seconds the solved screen is shown">
@@ -140,7 +284,13 @@
       <p class="hint">How long the "Solved!" MVP screen stays up before the next puzzle (3–600 s). Now: <b id="solved-now">—</b>. Also changes a solved screen that's already showing.</p>
     </section>
 
-    <section class="card">
+    <section class="card" id="hints-card">
+      <h2>Automatic hints</h2>
+      <label class="check"><input type="checkbox" id="autohints" checked> <span>Reveal a free cell when chat is stuck</span></label>
+      <p class="hint">When on, a cell is filled in for chat after <b id="autohints-secs">60</b> s with no right answers; the bar under the board counts down to it. Now: <b id="autohints-now">—</b>. "Reveal a hint" still works either way.</p>
+    </section>
+
+    <section class="card" id="scores-card">
       <h2>Scores</h2>
       <div class="btns">
         <button class="danger wide" data-cmd="resetround" data-confirm>Reset this puzzle's scores</button>
@@ -149,7 +299,7 @@
       <p class="hint">Click once, then click again within 3 seconds to confirm.</p>
     </section>
 
-    <section class="card">
+    <section class="card" id="play-card">
       <h2>Play as streamer</h2>
       <form id="chat-form">
         <input id="chat-text" placeholder="e.g. B7 4 or B7?35" autocomplete="off">
@@ -157,9 +307,65 @@
       </form>
       <p class="hint">Counts as a move from you, without typing in Twitch chat.</p>
     </section>
+    <section class="card full" id="custom">
+      <h2>Custom puzzle</h2>
+      <div class="cp">
+        <div>
+          <div id="cp-board" class="cp-board" aria-label="Custom puzzle editor"></div>
+          <p class="hint">Click a cell and type 1–9. Backspace, 0 or Space clears it. Arrow keys move. You can also paste a whole puzzle code into any cell.</p>
+        </div>
+        <div class="cp-side">
+          <div class="cp-row">
+            <label class="fld">Name (optional) <input id="cp-name" maxlength="40" placeholder="e.g. Sunday Special" autocomplete="off"></label>
+          </div>
+          <div class="fld">Type
+              <select id="cp-variant">
+                <option value="classic">Classic</option>
+                <option value="diagonal">Diagonal</option>
+                <option value="windoku">Windoku</option>
+                <option value="centerdot">Center Dot</option>
+                <option value="asterisk">Asterisk</option>
+              </select>
+          </div>
+          <div id="cp-result" class="cp-result">Type the givens into the grid. It's checked as you go.</div>
+          <div class="btns3">
+            <button id="cp-now" class="go" disabled title="Replaces the puzzle chat is on now">Play now</button>
+            <button id="cp-next" disabled title="Plays after the current puzzle is solved">Play next</button>
+            <button id="cp-save" class="ghost" disabled>Save</button>
+          </div>
+          <label class="fld">Puzzle code: 81 digits, 0 or . for blanks
+            <textarea id="cp-code" rows="3" spellcheck="false" placeholder="53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79"></textarea>
+          </label>
+          <div class="btns3">
+            <button class="ghost" id="cp-load">Load code</button>
+            <button class="ghost" id="cp-copy">Copy code</button>
+            <button class="danger" id="cp-clear">Clear grid</button>
+          </div>
+          <h3>Up next <button class="ghost" id="cp-clearq" hidden>Clear queue</button></h3>
+          <ol id="cp-queue" class="cp-list"></ol>
+          <h3>Saved puzzles</h3>
+          <ol id="cp-saved" class="cp-list"></ol>
+          <p class="hint">"Play now" skips the current puzzle. "Play next" waits until it's solved (several can wait in line). Custom puzzles don't change the adaptive difficulty. Saved puzzles stay in this control page.</p>
+        </div>
+      </div>
+    </section>
   </div>
   <div id="log"></div>
 
+</div>
+<footer class="ctrlbar">
+  <div class="seek"><span id="cb-filled">0</span><div class="track"><div class="fill" id="cb-fill"></div><div class="knob" id="cb-knob"></div></div><span id="cb-left">— left</span></div>
+  <div class="transport">
+    <button type="button" class="big" id="cb-play" title="Start / Stop" data-icon="play"></button>
+    <button type="button" id="cb-stop" title="Stop" data-icon="stop"></button>
+    <span class="sep"></span>
+    <button type="button" id="cb-new" title="New puzzle now" data-icon="next"></button>
+    <button type="button" id="cb-hint" title="Reveal a hint" data-icon="hint"></button>
+    <button type="button" id="cb-notes" title="Clear all notes" data-icon="erase"></button>
+    <button type="button" id="cb-custom" title="Custom puzzle" data-icon="star"></button>
+    <span class="now" id="cb-now">—</span>
+  </div>
+</footer>
 </div>
   <script src="js/sudoku.js"></script>
   <script>
@@ -242,6 +448,24 @@
     });
     document.querySelectorAll('button[data-solved]').forEach((b) => b.addEventListener('click', () => setSolved(b.dataset.solved)));
 
+    // ---- Automatic hints ----
+    let hintsTouched = 0;
+    function setAutoHints(on) {
+      hintsTouched = Date.now();
+      $('#autohints').checked = on;
+      send('autohints', on ? 'on' : 'off', on ? 'Automatic hints on' : 'Automatic hints off');
+    }
+    $('#autohints').addEventListener('change', () => setAutoHints($('#autohints').checked));
+    function syncAutoHints(cs) {
+      if (!cs || !Number.isFinite(cs.urlHintAfter)) return;
+      const secs = cs.urlHintAfter > 0 ? cs.urlHintAfter : 60;
+      const on = cs.autoHints === undefined ? cs.urlHintAfter > 0 : !!cs.autoHints;
+      if (Date.now() - hintsTouched > 3000) $('#autohints').checked = on;
+      $('#autohints-secs').textContent = secs;
+      $('#autohints-now').textContent = on ? `on, every ${secs}s` : 'off';
+      $('#menu-autohints').childNodes[1].textContent = `Automatic hints: ${on ? 'On' : 'Off'}`;
+    }
+
     function refresh() {
       const beat = +localStorage.getItem(LS_HEARTBEAT) || 0;
       const live = Date.now() - beat < 4000;
@@ -249,6 +473,7 @@
       gs.textContent = live ? '● running' : '○ not found — is the game source loaded with the same kind of URL?';
       gs.className = 'dot ' + (live ? 'ok' : 'no');
       syncSettings();
+      repaintChips();
       const pz = read('numbersonstream.paused');
       const stopped = !!(pz && pz.paused);
       $('#btn-start').disabled = !stopped;
@@ -256,14 +481,18 @@
       const rs = $('#run-state');
       rs.textContent = stopped ? '■ Stopped: chat is ignored and timers are frozen' : '▶ Running';
       rs.className = 'run-state ' + (stopped ? 'off' : 'on');
+      const qs = read(LS_SETTINGS);
+      renderQueue(qs && Array.isArray(qs.queue) ? qs.queue : []);
       const st = read(LS_STATUS);
       $('#chat-state').textContent = st ? st.text : '—';
       const cs = read(LS_SETTINGS);
+      syncAutoHints(cs);
       if (cs && Number.isFinite(cs.urlNextIn)) {
         const custom = Number.isFinite(cs.nextIn);
         $('#solved-now').textContent = custom ? `${cs.nextIn}s (URL default ${cs.urlNextIn}s)` : `${cs.urlNextIn}s (URL default)`;
       }
       const s = read(LS_CUR);
+      frame(stopped, live, s);
       if (!s || !s.grid) return;
       const filled = s.grid.filter(Boolean).length;
       $('#round').textContent = '#' + s.round;
@@ -282,6 +511,279 @@
       }
       if (!top.length) ol.append(Object.assign(document.createElement('li'), { textContent: 'No points yet' }));
     }
+    // ---- Dropdowns as button rows (see .chips) ----
+    // The <select> stays as the value holder, so the code that reads and sets it is unchanged.
+    const chipPainters = [];
+    function chipify(sel, short) {
+      sel.hidden = true;
+      const row = document.createElement('div');
+      row.className = 'chips'; row.setAttribute('role', 'radiogroup');
+      const paint = () => row.querySelectorAll('button').forEach((b) => { const on = b.dataset.v === sel.value; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      for (const o of sel.options) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.v = o.value; b.title = o.text;
+        b.textContent = (short && short[o.value]) || o.text;
+        b.addEventListener('click', () => { if (sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event('change')); } paint(); });
+        row.append(b);
+      }
+      sel.after(row); paint(); chipPainters.push(paint);
+    }
+    const repaintChips = () => chipPainters.forEach((f) => f());
+    chipify(mode, { auto: 'Adaptive', fixed: 'Fixed level', rotate: 'Cycle 1 → 20' });
+    chipify(variant, { mix: 'Mix', classic: 'Classic' });
+    chipify($('#cp-variant'));
+
+    // ---- Custom puzzle builder ----
+    const LS_LIB = 'numbersonstream.custompuzzles', LS_DRAFT = 'numbersonstream.customdraft';
+    const cpBoard = $('#cp-board'), cpVar = $('#cp-variant'), cpName = $('#cp-name'), cpCode = $('#cp-code');
+    const cpCells = [];
+    let cpGrid = new Array(81).fill(0), cpCheck = null, cpTimer = null;
+    const cpLabel = (p) => p.name ? `"${p.name}"` : 'custom puzzle';
+    for (let i = 0; i < 81; i++) {
+      const r = Math.floor(i / 9), c = i % 9;
+      const el = document.createElement('input');
+      el.inputMode = 'numeric'; el.autocomplete = 'off'; el.maxLength = 1;
+      el.setAttribute('aria-label', `${'ABCDEFGHI'[r]}${c + 1}`);
+      if (c === 2 || c === 5) el.classList.add('bx-r');
+      if (r === 2 || r === 5) el.classList.add('bx-b');
+      el.addEventListener('keydown', (e) => cpKey(e, i));
+      el.addEventListener('input', () => { const m = el.value.match(/[1-9]/g); cpSet(i, m ? +m[m.length - 1] : 0); if (m) cpMove(i, 1); });
+      el.addEventListener('paste', (e) => {
+        const g = Sudoku.parse(e.clipboardData.getData('text'));
+        if (!g) return;
+        e.preventDefault(); cpLoad(g);
+      });
+      cpCells.push(el); cpBoard.append(el);
+    }
+    function cpMove(i, d) { const j = i + d; if (j >= 0 && j < 81) cpCells[j].focus(); }
+    function cpKey(e, i) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key;
+      if (/^[1-9]$/.test(k)) { cpSet(i, +k); cpMove(i, 1); }
+      else if (k === 'Backspace') { if (cpGrid[i]) cpSet(i, 0); else { cpMove(i, -1); cpSet(Math.max(0, i - 1), 0); } }
+      else if (k === 'Delete' || k === '0' || k === ' ' || k === '.') { cpSet(i, 0); if (k !== 'Delete') cpMove(i, 1); }
+      else if (k === 'ArrowLeft') cpMove(i, -1);
+      else if (k === 'ArrowRight') cpMove(i, 1);
+      else if (k === 'ArrowUp') cpMove(i, -9);
+      else if (k === 'ArrowDown') cpMove(i, 9);
+      else return;
+      e.preventDefault();
+    }
+    function cpSet(i, v) { cpGrid[i] = v; cpChanged(); }
+    function cpLoad(g, variant, name) {
+      cpGrid = g.slice();
+      if (variant) cpVar.value = variant;
+      if (name !== undefined) cpName.value = name;
+      cpChanged();
+    }
+    function cpRender(conflicts = []) {
+      const extra = new Set(Sudoku.geometry(cpVar.value).extra.flatMap((u) => u.cells));
+      const bad = new Set(conflicts);
+      cpCells.forEach((el, i) => {
+        el.value = cpGrid[i] || '';
+        el.classList.toggle('x', extra.has(i));
+        el.classList.toggle('bad', bad.has(i));
+      });
+    }
+    function cpChanged() {
+      cpCheck = null;
+      cpCode.value = cpGrid.some(Boolean) ? Sudoku.stringify(cpGrid) : '';
+      try { localStorage.setItem(LS_DRAFT, JSON.stringify({ grid: Sudoku.stringify(cpGrid), variant: cpVar.value, name: cpName.value })); } catch {}
+      cpRender();
+      cpButtons();
+      repaintChips();
+      clearTimeout(cpTimer);
+      cpTimer = setTimeout(cpAnalyze, 250);
+    }
+    function cpAnalyze() {
+      const res = $('#cp-result');
+      const n = cpGrid.filter(Boolean).length;
+      if (!n) { res.className = 'cp-result'; res.textContent = "Type the givens into the grid. It's checked as you go."; cpRender(); return; }
+      const a = Sudoku.analyze(cpGrid, cpVar.value);
+      cpRender(a.conflicts);
+      if (a.ok) {
+        cpCheck = a;
+        res.className = 'cp-result ok';
+        res.innerHTML = '';
+        const b = document.createElement('b'); b.textContent = '✓ Ready to play. ';
+        res.append(b, `Exactly one solution · ${a.clues} givens · hardest step: ${Sudoku.TECH_NAMES[a.tech]} · about level ${a.level} (${LEVEL_NAMES[a.level]})`);
+      } else {
+        res.className = 'cp-result err';
+        res.textContent = `${a.error} (${n} given${n === 1 ? '' : 's'})`;
+      }
+      cpButtons();
+    }
+    function cpButtons() { ['#cp-now', '#cp-next', '#cp-save'].forEach((s) => { $(s).disabled = !cpCheck; }); }
+    function cpSend(p, when) {
+      send('custom', JSON.stringify({ puzzle: p.puzzle, variant: p.variant, name: p.name, when, id: Math.random().toString(36).slice(2) }),
+        when === 'now' ? `Play ${cpLabel(p)} now` : `Queue ${cpLabel(p)}`);
+    }
+    const cpCurrent = () => ({ puzzle: Sudoku.stringify(cpGrid), variant: cpVar.value, name: cpName.value.trim().slice(0, 40) });
+    cpVar.addEventListener('change', cpChanged);
+    cpName.addEventListener('input', () => { try { localStorage.setItem(LS_DRAFT, JSON.stringify({ grid: Sudoku.stringify(cpGrid), variant: cpVar.value, name: cpName.value })); } catch {} });
+    $('#cp-now').addEventListener('click', () => { if (cpCheck) cpSend(cpCurrent(), 'now'); });
+    $('#cp-next').addEventListener('click', () => { if (cpCheck) cpSend(cpCurrent(), 'next'); });
+    $('#cp-load').addEventListener('click', () => {
+      const g = Sudoku.parse(cpCode.value);
+      if (!g) { $('#log').textContent = 'The code needs exactly 81 cells: 1-9, with 0 or . for blanks'; return; }
+      cpLoad(g); $('#log').textContent = 'Puzzle code loaded';
+    });
+    $('#cp-copy').addEventListener('click', () => {
+      const t = Sudoku.stringify(cpGrid);
+      cpCode.value = t; cpCode.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+        () => { $('#log').textContent = 'Puzzle code copied'; },
+        () => { try { document.execCommand('copy'); $('#log').textContent = 'Puzzle code copied'; } catch { $('#log').textContent = 'Select the code and copy it'; } });
+    });
+    armConfirm($('#cp-clear'), () => { cpLoad(new Array(81).fill(0), null, ''); $('#log').textContent = 'Grid cleared'; });
+
+    // Saved puzzles live in this page's storage.
+    const lib = () => { const l = read(LS_LIB); return Array.isArray(l) ? l : []; };
+    function setLib(l) { try { localStorage.setItem(LS_LIB, JSON.stringify(l)); } catch {} renderLib(); }
+    $('#cp-save').addEventListener('click', () => {
+      if (!cpCheck) return;
+      const p = { ...cpCurrent(), level: cpCheck.level, saved: Date.now() };
+      const l = lib().filter((x) => !(x.puzzle === p.puzzle && x.variant === p.variant));
+      setLib([p, ...l]);
+      $('#log').textContent = `Saved ${cpLabel(p)}`;
+    });
+    function smallBtn(text, cls, fn) { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.addEventListener('click', fn); return b; }
+    function armConfirm(b, fn) {
+      let timer = null; const original = b.textContent;
+      b.addEventListener('click', () => {
+        if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Sure?'; timer = setTimeout(() => { b.classList.remove('armed'); b.textContent = original; }, 3000); return; }
+        clearTimeout(timer); b.classList.remove('armed'); b.textContent = original; fn();
+      });
+      return b;
+    }
+    function listItem(name, meta, buttons) {
+      const li = document.createElement('li');
+      const n = document.createElement('span'); n.className = 'nm'; n.textContent = name;
+      const m = document.createElement('span'); m.className = 'meta'; m.textContent = meta;
+      li.append(n, m, ...buttons);
+      return li;
+    }
+    const metaOf = (p) => `${VARIANT_NAMES[p.variant] || 'Classic'}${p.level ? ` · ~Lv ${p.level}` : ''}`;
+    function renderLib() {
+      const ol = $('#cp-saved'); ol.replaceChildren();
+      for (const p of lib()) {
+        ol.append(listItem(p.name || 'Untitled', metaOf(p), [
+          smallBtn('Play now', '', () => cpSend(p, 'now')),
+          smallBtn('Next', 'ghost', () => cpSend(p, 'next')),
+          smallBtn('Edit', 'ghost', () => { const g = Sudoku.parse(p.puzzle); if (g) { cpLoad(g, p.variant, p.name || ''); cpCells[0].focus(); } }),
+          armConfirm(smallBtn('✕', 'danger', () => {}), () => setLib(lib().filter((x) => !(x.puzzle === p.puzzle && x.variant === p.variant)))),
+        ]));
+      }
+      if (!ol.children.length) ol.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: 'Nothing saved yet' }));
+    }
+    let queueSig = null;
+    function renderQueue(q) {
+      const sig = JSON.stringify(q);
+      if (sig === queueSig) return;
+      queueSig = sig;
+      const ol = $('#cp-queue'); ol.replaceChildren();
+      q.forEach((p, k) => ol.append(listItem(`${k + 1}. ${p.name || 'Custom puzzle'}`, VARIANT_NAMES[p.variant] || 'Classic', [
+        smallBtn('✕', 'ghost', () => send('unqueue', p.id, `Removed ${cpLabel(p)} from the queue`)),
+      ])));
+      if (!q.length) ol.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: 'No custom puzzles waiting. Generated puzzles carry on as normal.' }));
+      $('#cp-clearq').hidden = q.length < 2;
+    }
+    $('#cp-clearq').addEventListener('click', () => send('clearqueue', '', 'Cleared the custom puzzle queue'));
+
+    const draft = read(LS_DRAFT);
+    if (draft && Sudoku.parse(draft.grid)) cpLoad(Sudoku.parse(draft.grid), Sudoku.VARIANTS[draft.variant] ? draft.variant : 'classic', draft.name || '');
+    else cpChanged();
+    renderLib();
+
+    // ---- Window frame ----
+    const ICONS = {
+      play: '<path d="M7 4.5v15l13-7.5z"/>',
+      pause: '<path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/>',
+      stop: '<path d="M5.5 5.5h13v13h-13z"/>',
+      next: '<path d="M4 5v14l10.5-7zM15 5h3.5v14H15z"/>',
+      hint: '<path d="M12 2.5a6.5 6.5 0 0 0-3.9 11.7c.6.5.9 1.1.9 1.8v.5h6V16c0-.7.3-1.3.9-1.8A6.5 6.5 0 0 0 12 2.5zM9 18h6v1.5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>',
+      erase: '<path d="M15.6 3.6a2 2 0 0 1 2.8 0l2 2a2 2 0 0 1 0 2.8L11.8 17H20v2H8.6l-5-5a2 2 0 0 1 0-2.8zM5 12.6 9.4 17h-.1l-4.3-4.3z"/>',
+      star: '<path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z"/>',
+    };
+    const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+    document.querySelectorAll('[data-icon]').forEach((b) => { b.innerHTML = icon(b.dataset.icon); });
+    $('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent($('.tw-logo').outerHTML.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'));
+    const win = $('#win'), menubar = $('#menubar');
+    $('#win-min').addEventListener('click', () => win.classList.toggle('rolled'));
+    $('#win-max').addEventListener('click', () => { win.classList.remove('rolled'); $('.page').scrollTo({ top: 0, behavior: 'smooth' }); });
+    $('#win-close').addEventListener('click', () => { $('#log').textContent = 'To close the control page, hide or remove its Browser Source in OBS.'; });
+    function closeMenus() { menubar.querySelectorAll('.menu.open').forEach((m) => m.classList.remove('open')); }
+    menubar.querySelectorAll('.menu').forEach((m) => {
+      const top = m.querySelector(':scope > button');
+      top.addEventListener('click', (e) => { e.stopPropagation(); const was = m.classList.contains('open'); closeMenus(); if (!was) m.classList.add('open'); });
+      top.addEventListener('mouseenter', () => { if (menubar.querySelector('.menu.open') && !m.classList.contains('open')) { closeMenus(); m.classList.add('open'); } });
+    });
+    document.addEventListener('click', closeMenus);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMenus();
+      if (e.altKey && !e.ctrlKey) {
+        const m = [...menubar.querySelectorAll('.menu')].find((x) => x.querySelector('u').textContent.toLowerCase() === e.key.toLowerCase());
+        if (m) { e.preventDefault(); closeMenus(); m.classList.add('open'); }
+      }
+    });
+    function goTo(id, focus) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      win.classList.remove('rolled');
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+      if (focus) setTimeout(() => $(focus).focus({ preventScroll: true }), 350);
+    }
+    const ACTS = {
+      start: () => send('start', '', '▶ Start'), stop: () => send('stop', '', '■ Stop'),
+      new: () => $('#new-now').click(), hint: () => send('hint', '', 'Reveal a hint'), clearnotes: () => send('clearnotes', '', 'Clear all notes'),
+      autohints: () => setAutoHints(!$('#autohints').checked),
+    };
+    // The theme is shared with the game source: changing it here (or in the game's View menu) changes both.
+    function setTheme(t, save = true) {
+      t = t === 'tavernworks' ? 'tavernworks' : 'indigo';
+      if (t === 'indigo') document.documentElement.dataset.theme = 'indigo'; else delete document.documentElement.dataset.theme;
+      if (save) try { localStorage.setItem('numbersonstream.theme', t); } catch {}
+      if (save && bc) bc.postMessage({ theme: t });
+      menubar.querySelectorAll('[data-theme-set]').forEach((b) => { b.querySelector('.ic').textContent = b.dataset.themeSet === t ? '✓' : ''; });
+    }
+    setTheme(document.documentElement.dataset.theme === 'indigo' ? 'indigo' : 'tavernworks', false);
+    window.addEventListener('storage', (e) => { if (e.key === 'numbersonstream.theme') setTheme(e.newValue, false); });
+    $('#menu-roll').addEventListener('click', () => win.classList.toggle('rolled'));
+    menubar.querySelectorAll('.drop button').forEach((b) => b.addEventListener('click', () => {
+      closeMenus();
+      if (b.dataset.themeSet) setTheme(b.dataset.themeSet);
+      else if (b.dataset.act) ACTS[b.dataset.act]();
+      else if (b.dataset.go) goTo(b.dataset.go, b.dataset.focus);
+      else if (b.dataset.href) window.open(b.dataset.href, '_blank', 'noopener');
+    }));
+    $('#cb-play').addEventListener('click', () => ($('#btn-start').disabled ? ACTS.stop : ACTS.start)());
+    $('#cb-stop').addEventListener('click', ACTS.stop);
+    $('#cb-new').addEventListener('click', ACTS.new);
+    $('#cb-hint').addEventListener('click', ACTS.hint);
+    $('#cb-notes').addEventListener('click', ACTS.clearnotes);
+    $('#cb-custom').addEventListener('click', () => goTo('custom'));
+    function frame(stopped, live, s) {
+      const playing = live && !stopped;
+      const want = playing ? 'pause' : 'play';
+      if ($('#cb-play').dataset.icon !== want) { $('#cb-play').dataset.icon = want; $('#cb-play').innerHTML = icon(want); }
+      $('#cb-play').title = playing ? 'Stop' : 'Start';
+      $('#cb-stop').disabled = stopped;
+      menubar.querySelector('[data-act=start]').disabled = !stopped;
+      menubar.querySelector('[data-act=stop]').disabled = stopped;
+      if (!s || !s.grid) { $('#win-title').textContent = 'Sudoku Control - Tavernworks'; $('#cb-now').textContent = live ? 'Waiting for a puzzle' : 'Game source not found'; return; }
+      const filled = s.grid.filter(Boolean).length, pct = (filled / 81 * 100) + '%';
+      $('#cb-fill').style.width = pct; $('#cb-knob').style.left = pct;
+      $('#cb-filled').textContent = `${filled}/81`;
+      $('#cb-left').textContent = `${81 - filled} left`;
+      const level = s.level || Sudoku.toLevel(s.difficulty);
+      const what = s.custom ? `★ ${s.custom.name || 'Custom puzzle'}` : `${VARIANT_NAMES[s.variant] || 'Classic'} · Lv ${level} ${LEVEL_NAMES[level] || ''}`;
+      $('#win-title').textContent = `Puzzle #${s.round} - ${s.custom ? (s.custom.name || 'Custom puzzle') : `Lv ${level}`} - Sudoku Control - Tavernworks`;
+      const nowEl = $('#cb-now'); nowEl.replaceChildren();
+      const b = document.createElement('b'); b.textContent = `Puzzle #${s.round}`;
+      nowEl.append(stopped ? '■ Stopped · ' : live ? '▶ Live · ' : '○ Game not found · ', b, ` · ${what}`);
+    }
+
     setInterval(refresh, 1000);
     refresh();
   </script>

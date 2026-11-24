@@ -9,6 +9,7 @@
     prefix: params.get('prefix') || '',
     hintAfter: num(params.get('hint'), 60), // seconds with no progress before a free cell is revealed (0 = off)
     cooldown: num(params.get('cooldown'), 3), // seconds a player waits after a wrong guess
+    hintCooldown: num(params.get('hintcd'), 60), // seconds between chat !hint requests (shared by everyone)
     nextIn: num(params.get('next'), 45), // seconds between puzzles
     maxPerMsg: num(params.get('max'), 3), // moves accepted from a single chat message
     demo: params.get('demo') === '1',
@@ -16,7 +17,23 @@
     transparent: params.get('bg') === 'transparent',
     notes: params.get('notes') !== '0', // viewers can pencil in notes, e.g. B7?35
     frame: params.get('frame') === '1', // fills the Sudoku window of GuildScribe's full stream theme
+    theme: (params.get('theme') || '').toLowerCase(), // starting colours if none chosen yet: indigo (default) or tavernworks
+    window: params.get('window') !== '0', // media-player style window around the game
   };
+  // Colours: Indigo by default. View > Theme (here or on the control page) picks one and both pages
+  // remember it; ?theme= in the link only sets the starting theme. GuildScribe's frame layout keeps its own look.
+  const LS_THEME = 'numbersonstream.theme';
+  let theme = (() => { try { return localStorage.getItem(LS_THEME); } catch { return null; } })() || cfg.theme;
+  function applyTheme(t) {
+    theme = t === 'tavernworks' ? 'tavernworks' : 'indigo';
+    document.body.classList.toggle('tw', theme === 'tavernworks' && !cfg.frame);
+  }
+  applyTheme(theme);
+  window.addEventListener('storage', (e) => { if (e.key === LS_THEME && e.newValue) applyTheme(e.newValue); });
+  try {
+    const logo = document.querySelector('.tw-logo');
+    if (logo) document.getElementById('favicon').href = 'data:image/svg+xml,' + encodeURIComponent(logo.outerHTML.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'));
+  } catch {}
 
   const POINTS = { correct: 10, unit: 5, finish: 10, wrong: -2 };
   const MAX = Sudoku.MAX_LEVEL;
@@ -50,6 +67,9 @@
       const u = new URL(location.href.split('?')[0]);
       for (const [k, v] of fd.entries()) if (v !== '') u.searchParams.set(k, v);
       if (!fd.get('bg')) u.searchParams.delete('bg');
+      const look = fd.get('look') || '';
+      u.searchParams.delete('look');
+      if (look === 'plain') u.searchParams.set('window', '0');
 
       if (fd.get('notes')) u.searchParams.delete('notes'); else u.searchParams.set('notes', '0');
       const lv = +form.difficulty.value, mode = fd.get('mode');
@@ -68,6 +88,7 @@
   }
 
   if (cfg.transparent) document.body.classList.add('transparent');
+  if (cfg.window && !cfg.frame) document.body.classList.add('windowed');
   if (cfg.frame) {
     // Parchment-and-wood look with the theme's fonts (Cinzel headings); the board keeps its plain, high-contrast digits.
     document.body.classList.add('framed');
@@ -142,13 +163,37 @@
     feed({ type: 'system', text: `Solved screen now shows for ${solvedSecs()}s` });
     if (roundOver) updateNextCountdown(); // apply to the screen showing right now
   }
+  // Automatic hints (a free cell after a while with no progress): the control page and
+  // "!sudoku autohints on|off" can switch them. Unset = follow the URL's hint= value.
+  const HINT_DEFAULT = 60;
+  settings.urlHintAfter = cfg.hintAfter; // lets the control page show the URL default
+  function hintSecs() {
+    if (settings.autoHints === false) return 0;
+    if (settings.autoHints === true) return cfg.hintAfter > 0 ? cfg.hintAfter : HINT_DEFAULT;
+    return cfg.hintAfter;
+  }
+  function setAutoHints(arg) {
+    const a = String(arg).trim().toLowerCase();
+    const wasOn = hintSecs() > 0;
+    if (a === 'on' || a === '1' || a === 'true') settings.autoHints = true;
+    else if (a === 'off' || a === '0' || a === 'false') settings.autoHints = false;
+    else if (a === 'toggle' || a === '') settings.autoHints = !wasOn;
+    else if (a === 'default' || a === 'reset') delete settings.autoHints;
+    else return;
+    saveSettings();
+    const on = hintSecs() > 0;
+    if (on && !wasOn && state) { state.lastProgress = Date.now(); save(); } // start a fresh countdown
+    feed({ type: 'system', text: on ? `Automatic hints on (every ${hintSecs()}s without progress)` : 'Automatic hints off' });
+    tick();
+  }
   saveSettings();
 
   // Old saves stored 'easy'/'medium'/'hard'; map them onto the 1-20 scale.
   function levelOf(s) { return s ? Sudoku.toLevel(s.level ?? s.difficulty) : 0; }
 
   function nextLevel() {
-    if (settings.mode === 'rotate') return (levelOf(state) % MAX) + 1;
+    // A custom puzzle doesn't move the cycle: carry on from the level before it.
+    if (settings.mode === 'rotate') return (levelOf(state && state.custom ? { level: state.baseLevel } : state) % MAX) + 1;
     return settings.level; // fixed, or auto (updated after every puzzle)
   }
 
@@ -172,7 +217,7 @@
   }
 
   function applyAdaptive(solved) {
-    if (settings.mode !== 'auto' || !state || !state.stats) return null;
+    if (settings.mode !== 'auto' || !state || !state.stats || state.custom) return null; // custom puzzles don't count
     // A level picked by the streamer during this puzzle wins over the automatic step.
     if ((settings.setAt || 0) > state.startedAt) return null;
     const step = adaptiveStep(state.stats, solved);
@@ -199,6 +244,45 @@
     return out;
   }
 
+  // ---------- Custom puzzles ----------
+  // Sent from the control page as JSON { puzzle, variant, name, when: 'now' | 'next' },
+  // or typed by a mod: "!sudoku custom [next] [diagonal] <81 digits, 0 or . for blanks>".
+  if (!Array.isArray(settings.queue)) settings.queue = [];
+  function readCustom(arg) {
+    const a = String(arg || '').trim();
+    if (a.startsWith('{')) { try { return JSON.parse(a); } catch { return null; } }
+    const out = { when: 'now', variant: 'classic', puzzle: '' };
+    for (const w of a.split(/\s+/).filter(Boolean)) {
+      const lw = w.toLowerCase();
+      if (lw === 'next' || lw === 'queue') out.when = 'next';
+      else if (lw === 'now') out.when = 'now';
+      else if (Sudoku.VARIANTS[lw] && !out.puzzle) out.variant = lw;
+      else out.puzzle += w;
+    }
+    return out;
+  }
+  function checkCustom(c) {
+    if (!c || typeof c !== 'object') return { error: 'Custom puzzle not understood' };
+    const variant = Sudoku.VARIANTS[c.variant] ? c.variant : 'classic';
+    const grid = Sudoku.parse(c.puzzle);
+    if (!grid) return { error: 'Custom puzzle needs 81 cells (1-9, with 0 or . for blanks)' };
+    const a = Sudoku.analyze(grid, variant);
+    if (!a.ok) return { error: `Custom puzzle not used: ${a.error}` };
+    const name = String(c.name || '').trim().slice(0, 40);
+    return { puzzle: Sudoku.stringify(grid), variant, name, a };
+  }
+  function customLabel(c) { return c.name ? `"${c.name}"` : 'custom puzzle'; }
+  function runCustom(arg) {
+    const raw = readCustom(arg);
+    const c = checkCustom(raw);
+    if (c.error) { feed({ type: 'system', text: c.error }); return; }
+    if (raw.when === 'next') {
+      settings.queue.push({ puzzle: c.puzzle, variant: c.variant, name: c.name, id: raw.id || String(Date.now()) });
+      saveSettings();
+      feed({ type: 'system', text: `Queued ${customLabel(c)} (${settings.queue.length} waiting)` });
+    } else newRound({ custom: c, skip: true });
+  }
+
   function newRound(opts = {}) {
     // Skipping an unsolved puzzle in adaptive mode counts as "too hard".
     if (opts.skip && !roundOver && state && state.stats && !opts.level) {
@@ -208,13 +292,26 @@
     clearInterval(nextTimer);
     roundOver = false;
     $('#overlay').classList.remove('show');
-    const level = opts.level || nextLevel();
-    let variant = opts.variant, mixIndex = state ? state.mixIndex : undefined;
-    if (!variant) {
-      const v = nextVariant();
-      if (typeof v === 'string') variant = v; else ({ variant, mixIndex } = v);
+    // Queued custom puzzles go first, unless a specific level or type was asked for.
+    let custom = opts.custom || null;
+    while (!custom && !opts.level && !opts.variant && settings.queue.length) {
+      const c = checkCustom(settings.queue.shift());
+      saveSettings();
+      if (c.error) feed({ type: 'system', text: c.error }); else custom = c;
     }
-    const p = Sudoku.generate(level, variant);
+    const baseLevel = state ? (state.custom ? state.baseLevel : state.level) : undefined;
+    let p, mixIndex = state ? state.mixIndex : undefined;
+    if (custom) {
+      p = { puzzle: custom.a.puzzle, solution: custom.a.solution, level: custom.a.level, variant: custom.variant, tech: custom.a.tech };
+    } else {
+      const level = opts.level || nextLevel();
+      let variant = opts.variant;
+      if (!variant) {
+        const v = nextVariant();
+        if (typeof v === 'string') variant = v; else ({ variant, mixIndex } = v);
+      }
+      p = Sudoku.generate(level, variant);
+    }
     state = {
       puzzle: p.puzzle, solution: p.solution,
       grid: p.puzzle.slice(),
@@ -226,6 +323,8 @@
       variant: p.variant,
       tech: p.tech,
       mixIndex,
+      custom: custom ? { name: custom.name } : null,
+      baseLevel,
       stats: { correct: 0, wrong: 0, hints: 0, toFill: p.puzzle.filter((v) => !v).length },
       round: (state ? state.round : 0) + 1,
       startedAt: Date.now(),
@@ -236,7 +335,9 @@
     save();
     renderAll();
     const geo = Sudoku.geometry(state.variant);
-    const label = `${geo.key === 'classic' ? '' : geo.name + ' '}puzzle (level ${state.level} · ${Sudoku.LEVELS[state.level].name})`;
+    const label = state.custom
+      ? `${state.custom.name ? `custom puzzle "${state.custom.name}"` : 'custom puzzle'}${geo.key === 'classic' ? '' : ` (${geo.name})`}, about level ${state.level}`
+      : `${geo.key === 'classic' ? '' : geo.name + ' '}puzzle (level ${state.level} · ${Sudoku.LEVELS[state.level].name})`;
     feed({ type: 'system', text: `New ${label}! Type a cell and a number, e.g. B7 4 or B74` });
     if (geo.rule) feed({ type: 'system', text: `Twist: ${geo.rule}` });
   }
@@ -276,7 +377,9 @@
   const MOVE_RE = /(?:^|[^A-Za-z0-9])([A-Ia-i])([1-9])\s*[=:\-]?\s*([1-9])(?![0-9])/g;
 
   // Notes: "B7?35" pencils in 3 and 5, "B7?-3" rubs out 3, "B7?x" (or "B7?0") clears the cell.
-  const NOTE_RE = /(?:^|[^A-Za-z0-9])([A-Ia-i])([1-9])\s*\?\s*(-?)\s*([1-9](?:[\s,]*[1-9]){0,8}|[0xX])(?![0-9A-Za-z])/g;
+  // Several cells at once: "A1A3?678", "A1 A3?678" or "A1,A3?678" pencils 6, 7 and 8 into A1 and A3.
+  const NOTE_RE = /(?:^|[^A-Za-z0-9])([A-Ia-i][1-9](?:[\s,]*[A-Ia-i][1-9])*)\s*\?\s*(-?)\s*([1-9](?:[\s,]*[1-9]){0,8}|[0xX])(?![0-9A-Za-z])/g;
+  const NOTE_CELLS_MAX = 9; // cells per note group, e.g. a whole row
 
   function stripPrefix(text) {
     const t = text.trim();
@@ -288,11 +391,14 @@
     const t = stripPrefix(text);
     if (t === null || !cfg.notes) return [];
     const out = [];
+    let groups = 0;
     for (const m of t.matchAll(NOTE_RE)) {
-      const clear = /^[0x]$/i.test(m[4]);
-      const mask = clear ? 0 : [...m[4].replace(/[^1-9]/g, '')].reduce((a, d) => a | (1 << +d), 0);
-      out.push({ index: ROWS.indexOf(m[1].toUpperCase()) * 9 + (+m[2] - 1), op: clear ? 'clear' : m[3] ? 'remove' : 'add', mask });
-      if (out.length >= cfg.maxPerMsg) break;
+      const clear = /^[0x]$/i.test(m[3]);
+      const mask = clear ? 0 : [...m[3].replace(/[^1-9]/g, '')].reduce((a, d) => a | (1 << +d), 0);
+      const op = clear ? 'clear' : m[2] ? 'remove' : 'add';
+      const cells = [...new Set([...m[1].matchAll(/([A-Ia-i])([1-9])/g)].map((c) => ROWS.indexOf(c[1].toUpperCase()) * 9 + (+c[2] - 1)))];
+      for (const index of cells.slice(0, NOTE_CELLS_MAX)) out.push({ index, op, mask });
+      if (++groups >= cfg.maxPerMsg) break;
     }
     return out;
   }
@@ -312,6 +418,7 @@
     const text = msg.text.trim();
     if (/^!sudoku\b/i.test(text)) return handleCommand(msg, text);
     if (roundOver || !state || paused) return;
+    if (/^!hint$/i.test(text)) return chatHint(msg);
     const notes = parseNotes(text);
     if (notes.length) applyNotes(notes);
     const moves = parseMoves(text);
@@ -371,8 +478,16 @@
     }
     else if (sub === 'stop' || sub === 'pause') setPaused(true);
     else if (sub === 'start' || sub === 'resume') setPaused(false);
+    else if (sub === 'custom') runCustom(arg);
+    else if (sub === 'clearqueue') { settings.queue = []; saveSettings(); feed({ type: 'system', text: 'Custom puzzle queue cleared' }); }
+    else if (sub === 'unqueue') {
+      const before = settings.queue.length;
+      settings.queue = settings.queue.filter((q) => q.id !== String(arg).trim());
+      if (settings.queue.length !== before) saveSettings();
+    }
     else if (sub === 'hint') giveHint();
     else if (sub === 'solvedtime') setSolvedTime(arg);
+    else if (sub === 'autohints' || sub === 'hints') setAutoHints(arg);
     else if (sub === 'resetscores') { allTime = {}; save(); renderBoards(); feed({ type: 'system', text: 'All-time scores reset' }); }
     else if (sub === 'clearnotes') { clearAllNotes(); feed({ type: 'system', text: 'All notes cleared' }); }
     else if (sub === 'resetround') {
@@ -503,10 +618,10 @@
     renderBoards();
   }
 
-  function giveHint() {
-    if (roundOver || !state) return;
+  function giveHint(askedBy) {
+    if (roundOver || !state) return false;
     const empty = state.grid.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
-    if (!empty.length) return;
+    if (!empty.length) return false;
     const i = empty[Math.floor(Math.random() * empty.length)];
     state.grid[i] = state.solution[i];
     state.owners[i] = { hint: true };
@@ -515,9 +630,28 @@
     cleanNotes(i);
     refreshExample();
     renderCell(i, 'pop');
-    feed({ type: 'system', text: `Hint: ${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} = ${state.solution[i]}` });
+    feed({ type: 'system', text: `${askedBy ? `${askedBy} used !hint: ` : 'Hint: '}${ROWS[Sudoku.row(i)]}${Sudoku.col(i) + 1} = ${state.solution[i]}` });
     save();
     if (state.grid.every(Boolean)) endRound();
+    return true;
+  }
+
+  // "!hint" from anyone in chat reveals a cell, then nobody can use it again for
+  // cfg.hintCooldown seconds. Asking during the cooldown gets one "ready in" reply per cooldown.
+  let chatHintReadyAt = 0, chatHintNagged = false;
+  function chatHint(msg) {
+    const now = Date.now();
+    if (now < chatHintReadyAt) {
+      if (!chatHintNagged) {
+        chatHintNagged = true;
+        feed({ type: 'system', text: `!hint is ready again in ${Math.ceil((chatHintReadyAt - now) / 1000)}s` });
+      }
+      return;
+    }
+    if (giveHint(msg.displayName || msg.user)) {
+      chatHintReadyAt = now + Math.max(0, cfg.hintCooldown) * 1000;
+      chatHintNagged = false;
+    }
   }
 
   function ranked(obj) { return Object.entries(obj).map(([user, s]) => ({ user, ...s })).sort((a, b) => b.points - a.points || b.cells - a.cells); }
@@ -531,14 +665,16 @@
     renderBoards();
     const secs = Math.round((Date.now() - state.startedAt) / 1000);
     const geo = Sudoku.geometry(state.variant);
-    $('#ov-time').textContent = `${geo.name} · level ${state.level} — solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
+    const what = state.custom ? `${state.custom.name || 'Custom puzzle'}${geo.key === 'classic' ? '' : ` · ${geo.name}`}` : `${geo.name} · level ${state.level}`;
+    $('#ov-time').textContent = `${what} — solved in ${fmtTime(secs)} by ${top.length} player${top.length === 1 ? '' : 's'}`;
     const list = $('#ov-list'); list.replaceChildren();
     top.slice(0, 5).forEach((p, idx) => list.append(row(idx + 1, p.name, p.color, `${p.points} pts · ${p.cells} cells`)));
     $('#ov-mvp').textContent = top[0] ? top[0].name : 'Nobody — hints solved it!';
     $('#ov-mvp').style.color = top[0] ? top[0].color : '';
     const nl = nextLevel();
     const arrow = adapt ? (adapt.delta > 0 ? `▲ up ${adapt.delta}` : adapt.delta < 0 ? `▼ down ${-adapt.delta}` : '● same') : '';
-    $('#ov-adapt').textContent = `Next: level ${nl} · ${Sudoku.LEVELS[nl].name}` + (adapt ? ` — ${arrow} (${adapt.why})` : '');
+    const q = settings.queue[0];
+    $('#ov-adapt').textContent = q ? `Next: ${q.name ? `"${q.name}"` : 'a custom puzzle'}` : `Next: level ${nl} · ${Sudoku.LEVELS[nl].name}` + (adapt ? ` — ${arrow} (${adapt.why})` : '');
     $('#ov-adapt').dataset.dir = adapt ? Math.sign(adapt.delta) : 0;
     if (adapt) feed({ type: 'system', text: `Chat got ${adapt.why}: next puzzle level ${nl}` });
     $('#overlay').classList.add('show');
@@ -638,8 +774,8 @@
     cells.forEach((_, i) => renderCell(i));
     renderExample();
     $('#round-no').textContent = `Puzzle #${state.round}`;
-    $('#difficulty').textContent = `Lv ${state.level} · ${Sudoku.LEVELS[state.level].name}`;
-    $('#difficulty').dataset.level = tier(state.level);
+    $('#difficulty').textContent = state.custom ? `★ ${state.custom.name || 'Custom'} · ~Lv ${state.level}` : `Lv ${state.level} · ${Sudoku.LEVELS[state.level].name}`;
+    $('#difficulty').dataset.level = state.custom ? 'custom' : tier(state.level);
     $('#variant').textContent = geo.name;
     $('#variant').hidden = geo.key === 'classic';
     $('#rule').textContent = geo.rule;
@@ -664,8 +800,23 @@
 
   function fmtTime(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
+  // ---------- Window frame (title bar + menu bar buttons) ----------
+  function renderWindow() {
+    if (!state || !document.body.classList.contains('windowed')) return;
+    const geo = Sudoku.geometry(state.variant);
+    const what = state.custom ? `★ ${state.custom.name || 'Custom puzzle'}` : `Lv ${state.level} ${Sudoku.LEVELS[state.level].name}`;
+    $('#gw-title').textContent = `Puzzle #${state.round} - ${what}${geo.key === 'classic' ? '' : ` (${geo.name})`} - Sudoku on Stream - Tavernworks`;
+    $('.gw-tools [data-act=stop]').disabled = paused;
+    const play = $('#gw-play'), want = paused ? 'play' : 'pause';
+    if (play.dataset.showing !== want) {
+      play.dataset.showing = want;
+      play.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${want === 'play' ? 'M7 4.5v15l13-7.5z' : 'M6 4h4.5v16H6zM13.5 4H18v16h-4.5z'}"/></svg>`;
+    }
+  }
+
   let lastFrac = 1;
   function tick() {
+    renderWindow();
     if (!state || paused) return;
     if (!roundOver) {
       const secs = Math.floor((Date.now() - state.startedAt) / 1000);
@@ -673,11 +824,12 @@
       const filled = state.grid.filter(Boolean).length;
       const bar = $('#progress-bar');
       $('#remaining').textContent = `${81 - filled} left`;
-      if (cfg.hintAfter > 0) {
+      const hintAfter = hintSecs();
+      if (hintAfter > 0) {
         // The bar is a countdown to the next free hint: full after a correct answer, empty when it drops.
         const idle = (Date.now() - state.lastProgress) / 1000;
-        const frac = Math.max(0, Math.min(1, 1 - idle / cfg.hintAfter));
-        const left = Math.ceil(cfg.hintAfter - idle);
+        const frac = Math.max(0, Math.min(1, 1 - idle / hintAfter));
+        const left = Math.ceil(hintAfter - idle);
         const refill = frac > lastFrac + 0.02; // jumped back up: snap rather than slide
         bar.classList.toggle('snap', refill);
         bar.style.width = `${frac * 100}%`;
@@ -687,6 +839,8 @@
         if (left <= 0) giveHint();
       } else {
         bar.style.width = `${(filled / 81) * 100}%`;
+        delete bar.dataset.level;
+        $('#hint-in').textContent = '';
       }
     }
   }
@@ -713,15 +867,21 @@
     else runCommand(c.cmd, c.arg || '');
   }
   window.addEventListener('storage', (e) => { if (e.key === LS_CMD && e.newValue) { try { onControl(JSON.parse(e.newValue)); } catch {} } });
-  if (!SANDBOX) try { new BroadcastChannel('numbersonstream').onmessage = (e) => onControl(e.data); } catch {}
+  if (!SANDBOX) try {
+    new BroadcastChannel('numbersonstream').onmessage = (e) => {
+      if (e.data && e.data.theme && !e.data.id) applyTheme(e.data.theme); else onControl(e.data);
+    };
+  } catch {}
   setInterval(() => store.set(LS_HEARTBEAT, Date.now()), 1000);
 
   // ---------- Boot ----------
   document.body.classList.toggle('paused', paused);
   buildBoard();
   $('#how-prefix').textContent = cfg.prefix;
+  $('#gw-ex').textContent = `${cfg.prefix}B7 4`;
   $('#how-prefix2').textContent = cfg.prefix;
   $('#how-prefix3').textContent = cfg.prefix;
+  { const s = Math.max(0, cfg.hintCooldown); $('#how-hintcd').textContent = s === 60 ? 'once a minute' : s ? `once every ${s}s` : 'any time'; }
   document.querySelectorAll('.how-prefix-n').forEach((e) => { e.textContent = cfg.prefix; });
   $('#how-notes').hidden = !cfg.notes;
   const saved = store.get(LS_CUR, null);
@@ -743,7 +903,74 @@
   setInterval(tick, 250);
   tick();
 
+  // ---------- Window menus and player buttons (work like the control page's) ----------
+  const menubar = $('#gw-menubar');
+  function closeMenus() { menubar.querySelectorAll('.menu.open').forEach((m) => m.classList.remove('open')); }
+  function markMenus() {
+    const tick = (b, on) => { b.querySelector('.ic').textContent = on ? '✓' : ''; };
+    menubar.querySelectorAll('[data-act=variant]').forEach((b) => tick(b, b.dataset.arg === settings.variant));
+    menubar.querySelectorAll('[data-act=mode]').forEach((b) => tick(b, b.dataset.arg === settings.mode));
+    menubar.querySelectorAll('[data-act=theme]').forEach((b) => tick(b, b.dataset.arg === theme));
+    tick(menubar.querySelector('[data-act=testchat]'), !$('#test-input').hidden);
+    tick(menubar.querySelector('[data-act=autohints]'), hintSecs() > 0);
+    menubar.querySelector('[data-act=start]').disabled = !paused;
+    menubar.querySelector('[data-act=stop]').disabled = paused;
+    menubar.querySelector('[data-act=harder]').disabled = settings.mode === 'rotate' || settings.level >= MAX;
+    menubar.querySelector('[data-act=easier]').disabled = settings.mode === 'rotate' || settings.level <= 1;
+    $('#gm-level').textContent = settings.mode === 'rotate' ? '' : `· next: ${settings.level} ${Sudoku.LEVELS[settings.level].name}`;
+  }
+  function setTheme(t) {
+    applyTheme(t);
+    try { localStorage.setItem(LS_THEME, theme); } catch {}
+    if (!SANDBOX) try { new BroadcastChannel('numbersonstream').postMessage({ theme }); } catch {}
+  }
+  function stepLevel(d) {
+    const lv = Math.min(MAX, Math.max(1, settings.level + d));
+    runCommand('level', `${settings.mode === 'auto' ? 'auto' : 'fixed'} ${lv}`);
+  }
+  const ACTIONS = {
+    start: () => setPaused(false), stop: () => setPaused(true), playpause: () => setPaused(!paused),
+    new: () => newRound({ skip: true }), hint: () => giveHint(), clearnotes: () => runCommand('clearnotes', ''),
+    autohints: () => setAutoHints('toggle'),
+    variant: (a) => runCommand('variant', a),
+    mode: (a) => runCommand('mode', a === 'fixed' ? `fixed ${settings.level}` : a),
+    harder: () => stepLevel(1), easier: () => stepLevel(-1),
+    resetround: () => runCommand('resetround', ''), resetscores: () => runCommand('resetscores', ''),
+    testchat: () => { const box = $('#test-input'); box.hidden = !box.hidden; if (!box.hidden) box.focus(); },
+    theme: (a) => setTheme(a),
+    href: (a) => window.open(a, '_blank', 'noopener'),
+    control: () => window.open('control.html', '_blank'),
+  };
+  menubar.querySelectorAll('.menu').forEach((m) => {
+    const top = m.querySelector('.top');
+    top.addEventListener('click', (e) => { e.stopPropagation(); const was = m.classList.contains('open'); closeMenus(); if (!was) { markMenus(); m.classList.add('open'); } });
+    top.addEventListener('mouseenter', () => { if (menubar.querySelector('.menu.open') && !m.classList.contains('open')) { closeMenus(); markMenus(); m.classList.add('open'); } });
+  });
+  document.querySelectorAll('#gwin [data-act]').forEach((b) => {
+    let armTimer = null; const label = b.lastChild && b.lastChild.nodeType === 3 ? b.lastChild : null, original = label && label.textContent;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (b.hasAttribute('data-confirm') && !b.classList.contains('armed')) {
+        b.classList.add('armed'); label.textContent = 'Click again to confirm';
+        armTimer = setTimeout(() => { b.classList.remove('armed'); label.textContent = original; }, 3000);
+        return;
+      }
+      if (armTimer) { clearTimeout(armTimer); b.classList.remove('armed'); label.textContent = original; }
+      closeMenus();
+      ACTIONS[b.dataset.act](b.dataset.arg);
+      renderWindow();
+    });
+  });
+  document.addEventListener('click', closeMenus);
+
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMenus();
+    if (e.altKey && !e.ctrlKey && !e.metaKey && document.body.classList.contains('windowed')) {
+      const m = [...menubar.querySelectorAll('.menu')].find((x) => x.querySelector('u').textContent.toLowerCase() === e.key.toLowerCase());
+      if (m) { e.preventDefault(); closeMenus(); markMenus(); m.classList.add('open'); }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) return;
     if (e.target.tagName === 'INPUT') return;
     if (e.key === 'n' || e.key === 'N') newRound({ skip: true });
     if (e.key === 'h' || e.key === 'H') giveHint();
@@ -777,9 +1004,10 @@
     }, 900);
   }
 
-  if (cfg.test) {
+  {
+    // Test box: shown with ?test=1, or from the window's Chat menu.
     const box = $('#test-input');
-    box.hidden = false;
+    box.hidden = !cfg.test;
     box.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || !box.value.trim()) return;
       handleChat({ user: 'streamer', displayName: 'Streamer', color: '#FFD700', isBroadcaster: true, isMod: true, text: box.value });
